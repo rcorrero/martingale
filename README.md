@@ -9,11 +9,8 @@ A paper trading web application that simulates real-time asset trading with virt
 - **Portfolio Management**: Track holdings, cash balance, and trading history
 - **Performance Analytics**: Comprehensive P&L tracking with realized/unrealized gains
 - **User Authentication**: Secure login system with persistent user portfolios
+- **Security Features**: Password strength requirements, rate limiting, CAPTCHA protection
 - **Responsive Design**: Works seamlessly on desktop and mobile devices
-
-## Screenshots
-
-*Add screenshots of your application here*
 
 ## Installation
 
@@ -66,6 +63,18 @@ The application uses environment variables for configuration. Copy `.env.example
 - `FLASK_DEBUG`: Enable/disable debug mode
 - `FLASK_PORT`: Port number for the application
 - `INITIAL_CASH`: Starting cash amount for new users
+- `RECAPTCHA_ENABLED`: Enable/disable CAPTCHA verification (optional)
+- `RECAPTCHA_SITE_KEY`: Google reCAPTCHA site key (if enabled)
+- `RECAPTCHA_SECRET_KEY`: Google reCAPTCHA secret key (if enabled)
+
+### Optional: Enable CAPTCHA
+
+To protect against bot registrations, you can enable Google reCAPTCHA:
+
+1. Get reCAPTCHA keys from: https://www.google.com/recaptcha/admin
+2. Set `RECAPTCHA_ENABLED=true` in your `.env` file
+3. Add your `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY`
+4. See [docs/RECAPTCHA_SETUP.md](docs/RECAPTCHA_SETUP.md) for detailed instructions
 
 ## Usage
 
@@ -138,11 +147,27 @@ For production use, consider replacing JSON file storage with a proper database:
 
 ## Security Considerations
 
-- Change the default `SECRET_KEY` in production
-- Use environment variables for sensitive configuration
-- Consider implementing rate limiting for API endpoints
-- Add input validation and sanitization
-- Use HTTPS in production
+⚠️ **Important**: This application implements multiple security features for production use.
+
+### Implemented Security Features
+- ✅ Strong password requirements (8+ chars, uppercase, lowercase, numbers, special chars)
+- ✅ Username validation and sanitization
+- ✅ Rate limiting on login attempts (5 attempts per 5 minutes)
+- ✅ Password hashing with scrypt algorithm
+- ✅ Session security (HttpOnly, SameSite, timeout)
+- ✅ CSRF protection on all forms
+- ✅ SQL injection prevention via SQLAlchemy ORM
+- ✅ XSS protection with secure cookie configuration
+- ✅ CAPTCHA for registration (optional, configurable)
+
+### For Production Deployment
+1. **Set strong SECRET_KEY** in environment variables
+2. **Use HTTPS** (SESSION_COOKIE_SECURE enabled in production)
+3. **Use PostgreSQL** instead of SQLite for better concurrency
+4. **Review SECURITY.md** for comprehensive security documentation
+5. **Keep dependencies updated** for security patches
+
+See [SECURITY.md](SECURITY.md) for detailed security documentation and best practices.
 
 ## License
 

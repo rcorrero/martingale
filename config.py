@@ -13,6 +13,23 @@ class Config:
     # Flask configuration
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     
+    # Session security configuration
+    SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie
+    SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+    PERMANENT_SESSION_LIFETIME = 3600  # 1 hour session timeout
+    
+    # CSRF protection (enabled by default with Flask-WTF)
+    WTF_CSRF_ENABLED = True
+    WTF_CSRF_TIME_LIMIT = None  # CSRF tokens don't expire (only session lifetime matters)
+    
+    # reCAPTCHA configuration
+    RECAPTCHA_ENABLED = os.environ.get('RECAPTCHA_ENABLED', 'False').lower() == 'true'
+    RECAPTCHA_SITE_KEY = os.environ.get('RECAPTCHA_SITE_KEY', '')
+    RECAPTCHA_SECRET_KEY = os.environ.get('RECAPTCHA_SECRET_KEY', '')
+    # Use reCAPTCHA v2 checkbox (change to v3 if preferred)
+    RECAPTCHA_USE_SSL = True
+    RECAPTCHA_OPTIONS = {'theme': 'dark'}  # Match terminal theme
+    
     # Database configuration
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///martingale.db'
     # Fix for Heroku postgres URL

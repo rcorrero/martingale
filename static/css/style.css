@@ -379,6 +379,32 @@ h2 {
     table-layout: fixed;
 }
 
+/* Column widths for time-and-sales table */
+#time-and-sales-table th:nth-child(1),
+#time-and-sales-table td:nth-child(1) {
+    width: 110px; /* Time column - wider to accommodate MM/DD HH:MM:SS */
+}
+
+#time-and-sales-table th:nth-child(2),
+#time-and-sales-table td:nth-child(2) {
+    width: 80px; /* Symbol column */
+}
+
+#time-and-sales-table th:nth-child(3),
+#time-and-sales-table td:nth-child(3) {
+    width: 70px; /* Side column */
+}
+
+#time-and-sales-table th:nth-child(4),
+#time-and-sales-table td:nth-child(4) {
+    width: auto; /* Size column */
+}
+
+#time-and-sales-table th:nth-child(5),
+#time-and-sales-table td:nth-child(5) {
+    width: auto; /* Price column */
+}
+
 #time-and-sales-table th {
     background: var(--terminal-surface);
     position: sticky;

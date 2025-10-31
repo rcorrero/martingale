@@ -6,13 +6,15 @@ from flask_socketio import SocketIO, emit
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
-from wtforms.validators import DataRequired, Length, EqualTo
+from wtforms.validators import DataRequired, Length, EqualTo, ValidationError, Regexp
 from werkzeug.security import generate_password_hash, check_password_hash
 import threading
 import time
 import json
 import os
 import logging
+import re
+from datetime import datetime, timedelta
 from config import config
 from price_client import HybridPriceService
 from models import db, User, Portfolio, Transaction, PriceData
@@ -59,15 +61,68 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+# Security: Rate limiting for login attempts
+login_attempts = {}
+RATE_LIMIT_ATTEMPTS = 5
+RATE_LIMIT_WINDOW = 300  # 5 minutes in seconds
+
+def validate_password_strength(form, field):
+    """Custom validator for password strength."""
+    password = field.data
+    
+    # Check minimum length
+    if len(password) < 8:
+        raise ValidationError('Password must be at least 8 characters long.')
+    
+    # Check for uppercase
+    if not re.search(r'[A-Z]', password):
+        raise ValidationError('Password must contain at least one uppercase letter.')
+    
+    # Check for lowercase
+    if not re.search(r'[a-z]', password):
+        raise ValidationError('Password must contain at least one lowercase letter.')
+    
+    # Check for digit
+    if not re.search(r'\d', password):
+        raise ValidationError('Password must contain at least one number.')
+    
+    # Check for special character
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        raise ValidationError('Password must contain at least one special character (!@#$%^&*(),.?":{}|<>).')
+
+def validate_username(form, field):
+    """Custom validator for username."""
+    username = field.data
+    
+    # Check for valid characters (alphanumeric and underscore only)
+    if not re.match(r'^[a-zA-Z0-9_]+$', username):
+        raise ValidationError('Username can only contain letters, numbers, and underscores.')
+    
+    # Check if username is reserved
+    reserved_usernames = ['admin', 'root', 'system', 'test', 'api', 'public', 'private']
+    if username.lower() in reserved_usernames:
+        raise ValidationError('This username is reserved and cannot be used.')
+
 class LoginForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=20)])
     password = PasswordField('Password', validators=[DataRequired()])
     submit = SubmitField('Login')
 
 class RegisterForm(FlaskForm):
-    username = StringField('Username', validators=[DataRequired(), Length(min=3, max=20)])
-    password = PasswordField('Password', validators=[DataRequired(), Length(min=6)])
-    password2 = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
+    username = StringField('Username', validators=[
+        DataRequired(), 
+        Length(min=3, max=20, message='Username must be between 3 and 20 characters.'),
+        validate_username
+    ])
+    password = PasswordField('Password', validators=[
+        DataRequired(), 
+        Length(min=8, message='Password must be at least 8 characters long.'),
+        validate_password_strength
+    ])
+    password2 = PasswordField('Confirm Password', validators=[
+        DataRequired(), 
+        EqualTo('password', message='Passwords must match.')
+    ])
     submit = SubmitField('Register')
 
 @login_manager.user_loader
@@ -78,6 +133,15 @@ def load_user(user_id):
     except ValueError:
         # If it's not a number, try to find by username
         return User.query.filter_by(username=user_id).first()
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    """Handle unauthorized access - return JSON for AJAX requests, redirect for browser requests."""
+    # Check if this is an AJAX/API request
+    if request.path.startswith('/api/') or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'error': 'Authentication required', 'authenticated': False}), 401
+    # For regular browser requests, redirect to login
+    return redirect(url_for('login'))
 
 def get_user_portfolio(user):
     """Get or create user portfolio with default values."""
@@ -174,6 +238,35 @@ def update_prices():
 def index():
     return render_template('index.html')
 
+def check_rate_limit(username):
+    """Check if user has exceeded login rate limit."""
+    current_time = datetime.now()
+    
+    if username in login_attempts:
+        attempts, first_attempt_time = login_attempts[username]
+        
+        # Check if we're still within the rate limit window
+        if (current_time - first_attempt_time).total_seconds() < RATE_LIMIT_WINDOW:
+            if attempts >= RATE_LIMIT_ATTEMPTS:
+                remaining_time = int(RATE_LIMIT_WINDOW - (current_time - first_attempt_time).total_seconds())
+                return False, remaining_time
+            else:
+                # Increment attempts
+                login_attempts[username] = (attempts + 1, first_attempt_time)
+        else:
+            # Reset the counter if window has passed
+            login_attempts[username] = (1, current_time)
+    else:
+        # First attempt
+        login_attempts[username] = (1, current_time)
+    
+    return True, 0
+
+def reset_rate_limit(username):
+    """Reset rate limit for a user after successful login."""
+    if username in login_attempts:
+        del login_attempts[username]
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -181,13 +274,26 @@ def login():
     
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
+        username = form.username.data
+        
+        # Check rate limiting
+        allowed, remaining_time = check_rate_limit(username)
+        if not allowed:
+            flash(f'Too many login attempts. Please try again in {remaining_time} seconds.')
+            logger.warning(f"Rate limit exceeded for user: {username}")
+            return render_template('login.html', form=form)
+        
+        user = User.query.filter_by(username=username).first()
         
         if user and user.check_password(form.password.data):
+            # Successful login
+            reset_rate_limit(username)
             login_user(user)
+            logger.info(f"Successful login: {username}")
             return redirect(url_for('index'))
         else:
             flash('Invalid username or password')
+            logger.warning(f"Failed login attempt for user: {username}")
     
     return render_template('login.html', form=form)
 

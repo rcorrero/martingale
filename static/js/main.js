@@ -393,8 +393,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function addTimeAndSalesEntry(trade, isInitialLoad = false) {
         if (!timeAndSalesFeed) return;
         
-        // Use the same date formatting as transaction history
-        const formattedTime = formatDateTime(trade.timestamp);
+        // Use compact date formatting for better fit in the table
+        const formattedTime = formatCompactDateTime(trade.timestamp);
         
         const row = document.createElement('tr');
         row.className = trade.type; // 'buy' or 'sell' for styling
@@ -403,7 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const color = getInstrumentColor(trade.symbol);
         
         row.innerHTML = `
-            <td style="color: #94a3b8; font-size: 11px;">${formattedTime}</td>
+            <td style="color: #94a3b8; font-size: 11px; white-space: nowrap;">${formattedTime}</td>
             <td><span class="symbol-badge" style="background-color: ${color};">${trade.symbol}</span></td>
             <td style="color: ${trade.type === 'buy' ? '#7dda58' : '#f85149'}; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
                 ${trade.type}
@@ -478,6 +478,33 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${dateString} ${timeString}`;
     }
 
+    function formatTimeOnly(timestamp) {
+        // Compact format for tables - shows only time (HH:MM:SS)
+        const date = new Date(timestamp);
+        
+        const timeString = date.toLocaleTimeString(undefined, {
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        
+        return timeString;
+    }
+
+    function formatCompactDateTime(timestamp) {
+        // Compact format - shows MM/DD HH:MM:SS
+        const date = new Date(timestamp);
+        
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        
+        return `${month}/${day} ${hours}:${minutes}:${seconds}`;
+    }
+
     function updateTransactionsTable() {
         if (!transactionsTableBody) return;
         
@@ -490,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = document.createElement('tr');
             row.className = `transaction-${transaction.type}`;
             row.innerHTML = `
-                <td style="color: #94a3b8; font-size: 11px;">${formatDateTime(transaction.timestamp)}</td>
+                <td style="color: #94a3b8; font-size: 11px; white-space: nowrap;">${formatCompactDateTime(transaction.timestamp)}</td>
                 <td><span class="symbol-badge" style="background-color: ${color};">${transaction.symbol}</span></td>
                 <td style="color: ${transaction.type === 'buy' ? '#7dda58' : '#f85149'}; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
                     ${transaction.type}
@@ -505,8 +532,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updatePerformance() {
         fetch('/api/performance')
-            .then(response => response.json())
+            .then(response => {
+                // Check if user is not authenticated
+                if (response.status === 401) {
+                    // User session expired, redirect to login
+                    window.location.href = '/login';
+                    return null;
+                }
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(performance => {
+                if (!performance) return; // Skip if redirected
+                
                 // Update portfolio value
                 portfolioValueEl.textContent = formatCurrencyLocale(performance.portfolio_value);
                 
@@ -528,8 +568,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Get cash from portfolio API since it's not in performance response
                 fetch('/api/portfolio')
-                    .then(response => response.json())
+                    .then(response => {
+                        if (response.status === 401) {
+                            window.location.href = '/login';
+                            return null;
+                        }
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
                     .then(portfolio => {
+                        if (!portfolio) return;
                         availableCashEl.textContent = formatCurrencyLocale(portfolio.cash);
                     })
                     .catch(error => {
@@ -550,7 +600,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Dynamic Chart Management System
     let chartInstances = []; // Array of chart objects
-    let chartCount = 2; // Default number of charts
+    let chartCount = 1; // Default number of charts
     let availableAssets = []; // Store available assets for autocomplete
 
     function initializeChartSystem() {
@@ -1168,15 +1218,35 @@ document.addEventListener('DOMContentLoaded', () => {
     // Update portfolio display
     function updatePortfolio() {
         fetch('/api/portfolio')
-            .then(response => response.json())
+            .then(response => {
+                // Check if user is not authenticated
+                if (response.status === 401) {
+                    // User session expired, redirect to login
+                    window.location.href = '/login';
+                    return null;
+                }
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(portfolio => {
+                if (!portfolio) return; // Skip if redirected
+                
                 userPortfolio = portfolio;
                 cashBalance.textContent = formatNumber(portfolio.cash, 2);
                 
                 // Fetch current prices to calculate market values
                 fetch('/api/assets')
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
                     .then(assets => {
+                        if (!assets) return;
+                        
                         holdingsList.innerHTML = '';
                         
                         // Add cash as the first item in holdings list
