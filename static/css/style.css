@@ -838,6 +838,7 @@ td {
 
 #holdings-list {
     padding-left: 0;
+    padding-right: 10px;
     max-height: 300px;
     overflow-y: auto;
     overflow-x: hidden;
