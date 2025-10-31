@@ -556,6 +556,17 @@ h2 {
         padding: 3px 4px;
         font-size: 10px;
     }
+    
+    /* Prevent timestamp overflow on mobile */
+    #time-and-sales-table th:nth-child(1),
+    #time-and-sales-table td:nth-child(1) {
+        width: 95px;
+        font-size: 9px;
+        padding: 3px 2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 }
 
 .portfolio-content {
@@ -1228,12 +1239,12 @@ td {
     max-width: 100%;
     background: var(--terminal-surface-light);
     border-radius: 8px;
-    padding: 15px 15px 60px 15px;  /* Even more bottom padding */
+    padding: 15px 15px 80px 15px;  /* Increased bottom padding to 80px for x-axis labels */
     box-shadow: 
         0 4px 6px rgba(0, 0, 0, 0.3),
         inset 0 1px 0 rgba(255, 255, 255, 0.05);
     box-sizing: border-box;
-    overflow: visible;  /* Allow labels to show outside container */
+    overflow: hidden;  /* Prevent labels from showing outside container */
     margin-bottom: 25px;  /* More margin for breathing room */
     border: 1px solid var(--terminal-border);
     min-width: 0; /* Allow containers to shrink below content size */
@@ -1481,9 +1492,10 @@ td {
     
     /* Chart optimizations */
     .chart-container {
-        padding: 10px;
+        padding: 10px 10px 90px 10px; /* Extra bottom padding on mobile for x-axis labels */
         height: 50vh; /* Smaller height on mobile */
-        min-height: 300px;
+        min-height: 350px; /* Increased min-height to accommodate labels */
+        overflow: hidden !important; /* Prevent overflow */
     }
     
     .chart-controls-header {
@@ -1579,8 +1591,9 @@ td {
     /* Chart container adjustments for small mobile */
     .chart-container {
         height: 40vh;
-        min-height: 250px;
-        padding: 8px;
+        min-height: 300px; /* Increased for labels */
+        padding: 8px 8px 80px 8px; /* Extra bottom padding for x-axis labels */
+        overflow: hidden !important;
     }
     
     /* Reduce section padding */
@@ -1611,7 +1624,12 @@ td {
     /* Time and sales - compact columns */
     #time-and-sales-table th:nth-child(1),
     #time-and-sales-table td:nth-child(1) {
-        width: 90px; /* Narrower time column */
+        width: 85px; /* Even narrower time column */
+        font-size: 9px; /* Smaller font for timestamps */
+        padding: 3px 2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
     
     /* Transaction table - hide total cost on very small screens */
