@@ -47,10 +47,10 @@ def create_default_data_files():
     
     price_data = {}
     current_time = int(time.time() * 1000)  # Current timestamp in milliseconds
-        
-        for symbol, asset_info in assets.items():
-            price = asset_info['price']
-            volatility = asset_info['volatility']
+    
+    for symbol, asset_info in assets.items():
+        price = asset_info['price']
+        volatility = asset_info['volatility']
             
             # Create some initial price history (last 50 points)
             history = []

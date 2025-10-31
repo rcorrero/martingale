@@ -24,11 +24,14 @@ def start_price_service():
 
 def wait_for_price_service(max_attempts=10):
     """Wait for the price service to become available."""
-    client = PriceServiceClient()
     for attempt in range(max_attempts):
-        if response.status_code == 200:
-            logger.info(f"✓ Price service is ready (attempt {attempt + 1})")
-            return True
+        try:
+            response = requests.get('http://localhost:5001/health', timeout=1)
+            if response.status_code == 200:
+                logger.info(f"✓ Price service is ready (attempt {attempt + 1})")
+                return True
+        except requests.exceptions.RequestException:
+            pass
         logger.debug(f"Waiting for price service... (attempt {attempt + 1}/{max_attempts})")
         time.sleep(1)
     return False
