@@ -239,6 +239,8 @@ h2 {
     gap: 15px;
     width: 100%;
     max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden; /* Prevent horizontal overflow */
 }
 
 @media (min-width: 1600px) {
@@ -397,12 +399,12 @@ h2 {
 
 #time-and-sales-table th:nth-child(4),
 #time-and-sales-table td:nth-child(4) {
-    width: auto; /* Size column */
+    width: 90px; /* Size column - wider for numbers */
 }
 
 #time-and-sales-table th:nth-child(5),
 #time-and-sales-table td:nth-child(5) {
-    width: auto; /* Price column */
+    width: 100px; /* Price column - wider for currency */
 }
 
 #time-and-sales-table th {
@@ -1015,7 +1017,9 @@ td {
     margin-top: 20px;
     grid-column: 1 / -1;
     width: 100%;
+    max-width: 100%;
     overflow: visible !important;  /* Force override of any parent overflow hidden */
+    box-sizing: border-box;
 }
 
 .chart-controls {
@@ -1095,6 +1099,9 @@ td {
     border-radius: 4px;
     border: 1px solid var(--terminal-border);
     margin-bottom: 10px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .chart-symbol-controls {
@@ -1103,6 +1110,9 @@ td {
     gap: 10px;
     margin-bottom: 10px;
     flex-wrap: wrap;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .chart-symbol-input {
@@ -1206,6 +1216,7 @@ td {
     width: 100%;
     max-width: 100%;
     overflow: visible;  /* Ensure chart labels can show */
+    box-sizing: border-box; /* Include padding in width calculation */
 }
 
 .chart-container {
@@ -1223,6 +1234,7 @@ td {
     overflow: visible;  /* Allow labels to show outside container */
     margin-bottom: 25px;  /* More margin for breathing room */
     border: 1px solid var(--terminal-border);
+    min-width: 0; /* Allow containers to shrink below content size */
 }
 
 .chart-container h3 {
