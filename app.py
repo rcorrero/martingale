@@ -297,33 +297,31 @@ def get_performance():
                 
                 # Calculate unrealized P&L using position_info
                 symbol_position = position_info.get(symbol, {})
-                cost_basis = float(symbol_position.get('total_cost', 0)) if symbol_position.get('total_cost') is not None else 0.0
-                if cost_basis > 0 and not (market_value != market_value):
-                    unrealized_pnl = market_value - cost_basis
+                total_cost = float(symbol_position.get('total_cost', 0)) if symbol_position.get('total_cost') is not None else 0.0
+                total_quantity = float(symbol_position.get('total_quantity', 0)) if symbol_position.get('total_quantity') is not None else 0.0
+                
+                # Calculate cost basis for current holdings only
+                # Average cost per share = total_cost / total_quantity
+                # Cost basis for current position = quantity × average_cost_per_share
+                if total_quantity > 0 and quantity > 0:
+                    average_cost_per_share = total_cost / total_quantity
+                    cost_basis_current = quantity * average_cost_per_share
+                    unrealized_pnl = market_value - cost_basis_current
                     if not (unrealized_pnl != unrealized_pnl):  # Check for NaN
                         total_unrealized_pnl += unrealized_pnl
         except (ValueError, TypeError, KeyError) as e:
             logger.warning(f"Error calculating market value for {symbol}: {e}")
             continue
     
-    # Calculate realized P&L by analyzing all transactions
-    initial_value = float(app.config.get('INITIAL_CASH', 100000.0))  # Starting cash from configuration
-    total_buys = 0.0
-    total_sells = 0.0
+    # Calculate total P&L
+    # Total P&L = (current portfolio value) - initial value
+    # This includes both realized (from closed positions) and unrealized (from open positions)
+    initial_value = float(app.config.get('INITIAL_CASH', 100000.0))
+    total_pnl = total_portfolio_value - initial_value
     
-    # Sum all buy and sell transactions
-    for transaction in current_user.transactions:
-        cost = float(transaction.total_cost) if transaction.total_cost is not None else 0.0
-        if transaction.type == 'buy':
-            total_buys += cost
-        elif transaction.type == 'sell':
-            total_sells += cost
-    
-    # Realized P&L = what we got from selling - what we paid for buying
-    realized_pnl = total_sells - total_buys
-    
-    # Total P&L = realized + unrealized
-    total_pnl = realized_pnl + total_unrealized_pnl
+    # Realized P&L = Total P&L - Unrealized P&L
+    # This represents gains/losses from positions that have been closed
+    realized_pnl = total_pnl - total_unrealized_pnl
     
     # Calculate total return percentage
     if initial_value > 0:

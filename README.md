@@ -1,6 +1,6 @@
 # Martingale
 
-A sophisticated paper trading web application that simulates real-time asset trading with virtual money. Built with Flask, SocketIO, and Chart.js for an interactive trading experience.
+A paper trading web application that simulates real-time asset trading with virtual money. Built with Flask, SocketIO, and Chart.js for an interactive trading experience.
 
 ## Features
 

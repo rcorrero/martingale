@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const assetsTableBody = document.querySelector('#assets-table tbody');
     const assetInput = document.getElementById('asset-input');
     const assetSuggestions = document.getElementById('asset-suggestions');
+    const assetSearchInput = document.getElementById('asset-search');
     const cashBalance = document.getElementById('cash-balance');
     const holdingsList = document.getElementById('holdings-list');
     const tradeForm = document.getElementById('trade-form');
@@ -32,6 +33,28 @@ document.addEventListener('DOMContentLoaded', () => {
     let portfolioPieChart = null;
     let previousPrices = {}; // Track previous prices for color comparison
     let openInterestData = {}; // Store open interest data for all assets
+    let currentlyHighlightedSymbol = null; // Track currently highlighted holding
+
+    // Function to apply asset search filter
+    function applyAssetSearchFilter() {
+        if (!assetSearchInput) return;
+        
+        const searchTerm = assetSearchInput.value.toLowerCase().trim();
+        if (!searchTerm) return; // No filter to apply
+        
+        const rows = assetsTableBody.querySelectorAll('tr');
+        rows.forEach(row => {
+            const symbolCell = row.querySelector('td');
+            if (symbolCell) {
+                const symbolText = symbolCell.textContent.toLowerCase();
+                if (symbolText.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        });
+    }
 
     // Define colors for each instrument
     const instrumentColors = {
@@ -161,13 +184,17 @@ document.addEventListener('DOMContentLoaded', () => {
                                     borderColor: '#2d3748',
                                     borderWidth: 2,
                                     hoverBorderWidth: 4,
-                                    hoverBorderColor: '#00ff88'
+                                    hoverBorderColor: '#00ff88',
+                                    hoverOffset: 0
                                 }]
                             },
                             options: {
                                 responsive: true,
                                 maintainAspectRatio: true,
                                 cutout: '50%',
+                                layout: {
+                                    padding: 10
+                                },
                                 plugins: {
                                     legend: {
                                         display: false
@@ -225,9 +252,19 @@ document.addEventListener('DOMContentLoaded', () => {
                                     if (activeElements.length > 0) {
                                         const activeElement = activeElements[0];
                                         const label = portfolioPieChart.data.labels[activeElement.index];
-                                        highlightHoldingsItem(label);
+                                        
+                                        // Only update if the highlighted symbol changed
+                                        if (currentlyHighlightedSymbol !== label) {
+                                            currentlyHighlightedSymbol = label;
+                                            clearHoldingsHighlight();
+                                            highlightHoldingsItem(label);
+                                        }
                                     } else {
-                                        clearHoldingsHighlight();
+                                        // Only clear if something was highlighted
+                                        if (currentlyHighlightedSymbol !== null) {
+                                            currentlyHighlightedSymbol = null;
+                                            clearHoldingsHighlight();
+                                        }
                                     }
                                 },
                                 elements: {
@@ -246,6 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         portfolioPieChart.data.labels = portfolioLabels;
                         portfolioPieChart.data.datasets[0].data = portfolioData;
                         portfolioPieChart.data.datasets[0].backgroundColor = portfolioColors;
+                        portfolioPieChart.data.datasets[0].hoverOffset = 0;
                         portfolioPieChart.update();
                     }
                     
@@ -409,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function formatQuantity(quantity) {
-        return formatNumber(quantity, 2);
+        return formatNumber(quantity, 0);
     }
 
     function formatPercentage(value) {
@@ -469,8 +507,6 @@ document.addEventListener('DOMContentLoaded', () => {
         fetch('/api/performance')
             .then(response => response.json())
             .then(performance => {
-                console.log('Performance data received:', performance);
-                
                 // Update portfolio value
                 portfolioValueEl.textContent = formatCurrencyLocale(performance.portfolio_value);
                 
@@ -1068,6 +1104,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Update price display for each chart
                     updatePriceDisplay(symbol);
                 }
+                
+                // Reapply search filter after table update
+                applyAssetSearchFilter();
             })
             .catch(error => {
                 console.error('Error fetching open interest:', error);
@@ -1100,6 +1139,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     updatePriceDisplay(symbol);
                 }
+                
+                // Reapply search filter after table update
+                applyAssetSearchFilter();
             });
     }
 
@@ -1130,38 +1172,58 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(portfolio => {
                 userPortfolio = portfolio;
                 cashBalance.textContent = formatNumber(portfolio.cash, 2);
-                holdingsList.innerHTML = '';
                 
-                // Add cash as the first item in holdings list
-                const cashColor = '#00d4ff'; // Cash color for consistency
-                const cashItem = `<li style="border-left: 3px solid ${cashColor}; padding-left: 12px; background: rgba(0, 0, 0, 0.3);">
-                    <span class="symbol-badge" style="background-color: ${cashColor}; margin-right: 8px;">CASH</span>
-                    <span style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight: 600;">$${formatNumber(portfolio.cash, 2)}</span>
-                </li>`;
-                holdingsList.innerHTML += cashItem;
-                
-                // Add asset holdings
-                for (const symbol in portfolio.holdings) {
-                    const quantity = portfolio.holdings[symbol];
-                    if (quantity > 0) {
-                        const color = getInstrumentColor(symbol);
-                        const vwap = calculateVWAP(symbol);
-                        const vwapText = vwap ? ` <span style="color: #00d4ff;">(VWAP: ${formatCurrencyLocale(vwap)})</span>` : '';
-                        const item = `<li style="border-left: 3px solid ${color}; padding-left: 12px; background: rgba(0, 0, 0, 0.3);">
-                            <span class="symbol-badge" style="background-color: ${color}; margin-right: 8px;">${symbol}</span>
-                            <span style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatQuantity(quantity)}</span>${vwapText}
+                // Fetch current prices to calculate market values
+                fetch('/api/assets')
+                    .then(response => response.json())
+                    .then(assets => {
+                        holdingsList.innerHTML = '';
+                        
+                        // Add cash as the first item in holdings list
+                        const cashColor = '#00d4ff'; // Cash color for consistency
+                        const cashItem = `<li style="border-left: 3px solid ${cashColor}; padding-left: 12px; background: rgba(0, 0, 0, 0.3);">
+                            <span class="symbol-badge" style="background-color: ${cashColor}; margin-right: 8px;">CASH</span>
+                            <span style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight: 600;">$${formatNumber(portfolio.cash, 2)}</span>
                         </li>`;
-                        holdingsList.innerHTML += item;
-                    }
-                }
-                
-                // Update pie chart
-                createOrUpdatePortfoliePieChart();
-                
-                // Set up cross-highlighting after holdings list is updated
-                setTimeout(() => {
-                    updateHoldingsCrossHighlighting();
-                }, 100); // Small delay to ensure DOM is updated
+                        holdingsList.innerHTML += cashItem;
+                        
+                        // Add asset holdings
+                        for (const symbol in portfolio.holdings) {
+                            const quantity = portfolio.holdings[symbol];
+                            if (quantity > 0) {
+                                const color = getInstrumentColor(symbol);
+                                const vwap = calculateVWAP(symbol);
+                                
+                                // Calculate market value using current price from assets or previousPrices
+                                const currentPrice = assets[symbol]?.price || previousPrices[symbol];
+                                const marketValue = currentPrice ? quantity * currentPrice : null;
+                                
+                                // Build the holding display with clear labels
+                                const quantityDisplay = `<span style="color: #94a3b8; font-size: 11px;">QTY:</span> <span style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatQuantity(quantity)}</span>`;
+                                const marketValueDisplay = marketValue ? ` <span style="color: #94a3b8; font-size: 11px; margin-left: 12px;">VALUE:</span> <span style="color: #7dda58; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatCurrencyLocale(marketValue)}</span>` : '';
+                                const vwapDisplay = vwap ? ` <span style="color: #94a3b8; font-size: 11px; margin-left: 12px;">VWAP:</span> <span style="color: #00d4ff; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatCurrencyLocale(vwap)}</span>` : '';
+                                
+                                const item = `<li style="border-left: 3px solid ${color}; padding-left: 12px; background: rgba(0, 0, 0, 0.3);">
+                                    <div style="display: flex; align-items: center; flex-wrap: wrap;">
+                                        <span class="symbol-badge" style="background-color: ${color}; margin-right: 12px;">${symbol}</span>
+                                        ${quantityDisplay}${marketValueDisplay}${vwapDisplay}
+                                    </div>
+                                </li>`;
+                                holdingsList.innerHTML += item;
+                            }
+                        }
+                        
+                        // Update pie chart
+                        createOrUpdatePortfoliePieChart();
+                        
+                        // Set up cross-highlighting after holdings list is updated
+                        setTimeout(() => {
+                            updateHoldingsCrossHighlighting();
+                        }, 100); // Small delay to ensure DOM is updated
+                    })
+                    .catch(error => {
+                        console.error('Error fetching assets for portfolio:', error);
+                    });
             });
     }
 
@@ -1392,6 +1454,26 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Initial portfolio load
     updatePortfolio();
+
+    // Asset search functionality
+    if (assetSearchInput) {
+        assetSearchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase().trim();
+            const rows = assetsTableBody.querySelectorAll('tr');
+            
+            rows.forEach(row => {
+                const symbolCell = row.querySelector('td');
+                if (symbolCell) {
+                    const symbolText = symbolCell.textContent.toLowerCase();
+                    if (symbolText.includes(searchTerm)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                }
+            });
+        });
+    }
 
     // Initialize chart controls
     const chartCountSelect = document.getElementById('chart-count');
