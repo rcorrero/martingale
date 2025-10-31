@@ -51,31 +51,31 @@ def create_default_data_files():
     for symbol, asset_info in assets.items():
         price = asset_info['price']
         volatility = asset_info['volatility']
-            
-            # Create some initial price history (last 50 points)
-            history = []
-            base_time = current_time - (50 * 1000)  # 50 seconds ago
-            
-            for i in range(50):
-                timestamp = base_time + (i * 1000)
-                # Add some realistic price variation
-                price_variation = price * (0.95 + (i / 50) * 0.1)  # Slight upward trend
-                history.append({
-                    'time': timestamp,
-                    'price': round(price_variation, 2)
-                })
-            
-            price_data[symbol] = {
-                'price': price,
-                'volatility': volatility,
-                'history': history
-            }
         
-        with open('price_data.json', 'w') as f:
-            json.dump(price_data, f, indent=2)
+        # Create some initial price history (last 50 points)
+        history = []
+        base_time = current_time - (50 * 1000)  # 50 seconds ago
         
-        print(f"✅ Created price_data.json with {len(assets)} assets")
-        print(f"   Assets: {', '.join(assets.keys())}")
+        for i in range(50):
+            timestamp = base_time + (i * 1000)
+            # Add some realistic price variation
+            price_variation = price * (0.95 + (i / 50) * 0.1)  # Slight upward trend
+            history.append({
+                'time': timestamp,
+                'price': round(price_variation, 2)
+            })
+        
+        price_data[symbol] = {
+            'price': price,
+            'volatility': volatility,
+            'history': history
+        }
+    
+    with open('price_data.json', 'w') as f:
+        json.dump(price_data, f, indent=2)
+    
+    print(f"✅ Created price_data.json with {len(assets)} assets")
+    print(f"   Assets: {', '.join(assets.keys())}")
     
     # 4. Create global_transactions.json if missing
     if not os.path.exists('global_transactions.json'):
