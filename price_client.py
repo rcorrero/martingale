@@ -162,6 +162,41 @@ class FallbackPriceService:
                 'last_update': None
             }
     
+    def add_asset(self, symbol: str, initial_price: float, volatility: float = 0.02):
+        """Add a new asset to the fallback service.
+        
+        Args:
+            symbol: Asset symbol
+            initial_price: Starting price
+            volatility: Price volatility
+        """
+        if symbol not in self.assets:
+            self.assets[symbol] = {
+                'price': initial_price,
+                'volatility': volatility,
+                'history': [],
+                'last_update': None
+            }
+            logger.info(f"Added asset {symbol} to fallback price service")
+    
+    def remove_asset(self, symbol: str):
+        """Remove an asset from the fallback service.
+        
+        Args:
+            symbol: Asset symbol to remove
+        """
+        if symbol in self.assets:
+            del self.assets[symbol]
+            logger.info(f"Removed asset {symbol} from fallback price service")
+    
+    def get_symbols(self) -> List[str]:
+        """Get list of all tracked symbols.
+        
+        Returns:
+            List of symbol strings
+        """
+        return list(self.assets.keys())
+    
     def update_prices(self):
         """Update prices using random walk (similar to original implementation)."""
         import numpy as np
@@ -271,3 +306,26 @@ class HybridPriceService:
     def is_using_api(self) -> bool:
         """Check if currently using API (vs fallback)."""
         return self._api_available
+    
+    def sync_assets_from_db(self, active_assets):
+        """Sync fallback price service with active assets from database.
+        
+        Args:
+            active_assets: List of Asset model instances from database
+        """
+        # Get current symbols in price service
+        current_symbols = set(self.fallback.get_symbols())
+        db_symbols = {asset.symbol for asset in active_assets}
+        
+        # Add new assets
+        for asset in active_assets:
+            if asset.symbol not in current_symbols:
+                self.fallback.add_asset(
+                    symbol=asset.symbol,
+                    initial_price=asset.initial_price,
+                    volatility=asset.volatility
+                )
+        
+        # Remove assets no longer in database
+        for symbol in current_symbols - db_symbols:
+            self.fallback.remove_asset(symbol)

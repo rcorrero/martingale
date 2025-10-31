@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const sellAllBtn = document.getElementById('sell-all-btn');
     const chartsContainer = document.getElementById('charts-container');
     const transactionsTableBody = document.querySelector('#transactions-table tbody');
-    const timeAndSalesFeed = document.getElementById('time-and-sales-feed');
     
     // Time display elements
     const utcTimeEl = document.getElementById('utc-time');
@@ -30,8 +29,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const charts = {};
     let userTransactions = [];
     let userPortfolio = {};
+    let currentUserId = null; // Store current user ID for filtering
     let portfolioPieChart = null;
     let previousPrices = {}; // Track previous prices for color comparison
+    let cachedSettlements = []; // Cache settlements to prevent flickering
     let openInterestData = {}; // Store open interest data for all assets
     let currentlyHighlightedSymbol = null; // Track currently highlighted holding
 
@@ -57,22 +58,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Define colors for each instrument
-    const instrumentColors = {
-        'XQR': '#f7931a', // Orange
-        'ZLN': '#627eea', // Blue  
-        'FWX': '#2ca02c', // Green
-        'KVT': '#d62728', // Red
-        'PGH': '#9467bd', // Purple
-        'MWZ': '#8c564b', // Brown
-        'DQB': '#e377c2', // Pink
-        'LNC': '#17becf', // Cyan
-        'EPS': '#ff7f0e', // Bright Orange
-        'ACT': '#1f77b4', // Steel Blue
-        'ORD': '#bcbd22'  // Olive
-    };
+    // Dynamic color assignment for instruments
+    const instrumentColors = {};
+    
+    // Predefined color palette for random assignment (fallback only)
+    const colorPalette = [
+        '#f7931a', '#627eea', '#2ca02c', '#d62728', '#9467bd',
+        '#8c564b', '#e377c2', '#17becf', '#ff7f0e', '#1f77b4',
+        '#bcbd22', '#ff6384', '#36a2eb', '#ffce56', '#4bc0c0',
+        '#ff9f40', '#9966ff', '#c9cbcf', '#00d084', '#fe6b8b'
+    ];
+    
+    let colorIndex = 0;
 
-    function getInstrumentColor(symbol) {
-        return instrumentColors[symbol] || '#6c757d'; // Default gray for unknown instruments
+    function getInstrumentColor(symbol, assetData = null) {
+        // If asset data provided with color, use it and cache it
+        if (assetData && assetData.color) {
+            instrumentColors[symbol] = assetData.color;
+            return assetData.color;
+        }
+        
+        // If color already cached, return it
+        if (instrumentColors[symbol]) {
+            return instrumentColors[symbol];
+        }
+        
+        // Fallback: assign a new color from the palette
+        const color = colorPalette[colorIndex % colorPalette.length];
+        instrumentColors[symbol] = color;
+        colorIndex++;
+        
+        return color;
     }
 
     // Time display functions
@@ -291,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateHoldingsCrossHighlighting();
                 })
                 .catch(error => {
-                    console.error('Error fetching assets for pie chart:', error);
+                    // Error fetching assets for pie chart
                 });
         }
     };
@@ -387,48 +403,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Time and Sales functionality
-    const maxTimeAndSalesEntries = 50; // Keep only the most recent 50 entries
-    
-    function addTimeAndSalesEntry(trade, isInitialLoad = false) {
-        if (!timeAndSalesFeed) return;
-        
-        // Use compact date formatting for better fit in the table
-        const formattedTime = formatCompactDateTime(trade.timestamp);
-        
-        const row = document.createElement('tr');
-        row.className = trade.type; // 'buy' or 'sell' for styling
-        
-        // Get instrument color for symbol badge
-        const color = getInstrumentColor(trade.symbol);
-        
-        row.innerHTML = `
-            <td style="color: #94a3b8; font-size: 11px; white-space: nowrap;">${formattedTime}</td>
-            <td><span class="symbol-badge" style="background-color: ${color};">${trade.symbol}</span></td>
-            <td style="color: ${trade.type === 'buy' ? '#7dda58' : '#f85149'}; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
-                ${trade.type}
-            </td>
-            <td style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">${formatQuantity(trade.quantity)}</td>
-            <td style="color: #00d4ff; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(trade.price)}</td>
-        `;
-        
-        // Always add to the top (most recent first) since backend data is already sorted newest first
-        timeAndSalesFeed.insertBefore(row, timeAndSalesFeed.firstChild);
-        
-        // Remove old entries if we exceed the maximum
-        while (timeAndSalesFeed.children.length > maxTimeAndSalesEntries) {
-            timeAndSalesFeed.removeChild(timeAndSalesFeed.lastChild);
-        }
-        
-        // Scroll to top to show the new entry (scroll the container, not the tbody)
-        if (!isInitialLoad) {
-            const container = document.getElementById('time-and-sales-container');
-            if (container) {
-                container.scrollTop = 0;
-            }
-        }
-    }
-
     // Enhanced number formatting functions with locale support
     function formatNumber(number, decimals = 2) {
         return new Intl.NumberFormat(undefined, {
@@ -505,6 +479,64 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${month}/${day} ${hours}:${minutes}:${seconds}`;
     }
 
+    function formatTimeToExpiry(seconds) {
+        // Format time remaining until expiration
+        if (seconds <= 0) {
+            return '<span style="color: #f85149; font-weight: 600;">EXPIRED</span>';
+        }
+        
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor((seconds % 86400) / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        
+        // Color coding based on urgency (adjusted for shorter asset lifetimes)
+        let color = '#94a3b8'; // Default gray
+        if (seconds < 60) { // Less than 1 minute
+            color = '#f85149'; // Red
+        } else if (seconds < 300) { // Less than 5 minutes
+            color = '#ff9800'; // Orange
+        } else if (seconds < 900) { // Less than 15 minutes
+            color = '#ffeb3b'; // Yellow
+        }
+        
+        let formatted = '';
+        if (days > 0) {
+            formatted = `${days}d ${hours}h`;
+        } else if (hours > 0) {
+            formatted = `${hours}h ${minutes}m`;
+        } else if (minutes > 0) {
+            formatted = `${minutes}m`;
+        } else {
+            // Show seconds countdown when under 1 minute
+            formatted = `${secs}s`;
+        }
+        
+        return `<span style="color: ${color}; font-weight: 600; font-family: 'JetBrains Mono', monospace;">${formatted}</span>`;
+    }
+
+    function showNotification(message, type = 'info') {
+        // Show notification banner at top of page
+        const container = document.getElementById('notification-container');
+        if (!container) return;
+        
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <span class="notification-message">${message}</span>
+            <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+        `;
+        
+        container.appendChild(notification);
+        
+        // Auto-remove after 10 seconds
+        setTimeout(() => {
+            if (notification.parentElement) {
+                notification.remove();
+            }
+        }, 10000);
+    }
+
     function updateTransactionsTable() {
         if (!transactionsTableBody) return;
         
@@ -516,11 +548,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const color = getInstrumentColor(transaction.symbol);
             const row = document.createElement('tr');
             row.className = `transaction-${transaction.type}`;
+            
+            // Special styling for settlement transactions - use sell color
+            const isSettlement = transaction.type === 'settlement';
+            const typeColor = isSettlement ? '#f85149' : (transaction.type === 'buy' ? '#7dda58' : '#f85149');
+            const typeText = isSettlement ? 'SETTLED' : transaction.type.toUpperCase();
+            
             row.innerHTML = `
                 <td style="color: #94a3b8; font-size: 11px; white-space: nowrap;">${formatCompactDateTime(transaction.timestamp)}</td>
                 <td><span class="symbol-badge" style="background-color: ${color};">${transaction.symbol}</span></td>
-                <td style="color: ${transaction.type === 'buy' ? '#7dda58' : '#f85149'}; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
-                    ${transaction.type}
+                <td style="color: ${typeColor}; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                    ${typeText}
                 </td>
                 <td style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">${formatQuantity(transaction.quantity)}</td>
                 <td style="color: #00d4ff; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(transaction.price)}</td>
@@ -583,11 +621,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         availableCashEl.textContent = formatCurrencyLocale(portfolio.cash);
                     })
                     .catch(error => {
-                        console.error('Error fetching portfolio for cash:', error);
+                        // Error fetching portfolio for cash
                     });
             })
             .catch(error => {
-                console.error('Error fetching performance data:', error);
+                // Error fetching performance data
                 // Set fallback values to prevent NaN display
                 portfolioValueEl.textContent = formatCurrencyLocale(100000);
                 totalPnlEl.textContent = formatCurrencyLocale(0);
@@ -1071,22 +1109,17 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     }
 
-    // Initial load of transaction history, portfolio, and global transactions
+    // Initial load of transaction history and portfolio
     Promise.all([
         fetch('/api/transactions').then(response => response.json()),
-        fetch('/api/portfolio').then(response => response.json()),
-        fetch('/api/global-transactions').then(response => response.json())
-    ]).then(([transactions, portfolio, globalTransactions]) => {
+        fetch('/api/portfolio').then(response => response.json())
+    ]).then(([transactions, portfolio]) => {
         userTransactions = transactions;
         userPortfolio = portfolio;
+        currentUserId = portfolio.user_id; // Store user ID
         updateTransactionsTable();
         updatePortfolio();
         updatePerformance();
-        
-        // Load initial global transactions into Time & Sales (already sorted newest first from backend)
-        globalTransactions.forEach(transaction => {
-            addTimeAndSalesEntry(transaction, true); // Pass flag for initial loading
-        });
         
         // Update VWAP lines for all charts after portfolio is loaded
         Object.keys(charts).forEach(symbol => {
@@ -1127,8 +1160,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Sort symbols alphabetically
                 const sortedSymbols = Object.keys(assets).sort();
                 for (const symbol of sortedSymbols) {
-                    const currentPrice = assets[symbol].price;
-                    const color = getInstrumentColor(symbol);
+                    const assetData = assets[symbol];
+                    const currentPrice = assetData.price;
+                    const color = getInstrumentColor(symbol, assetData);
                     
                     // Determine price color based on change
                     let priceColor = '#e2e8f0'; // Default neutral color (terminal text)
@@ -1147,9 +1181,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Get open interest for this symbol
                     const totalOpenInterest = openInterest[symbol] || 0;
                     
+                    // Format expiration time
+                    const timeToExpiry = assetData.time_to_expiry_seconds || 0;
+                    const expiryDisplay = formatTimeToExpiry(timeToExpiry);
+                    
                     const row = `<tr style="border-left: 4px solid ${color};">
                         <td><span class="symbol-badge" style="background-color: ${color};">${symbol}</span></td>
                         <td style="color: ${priceColor}; font-weight: 600; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(currentPrice)}</td>
+                        <td style="font-family: 'JetBrains Mono', monospace;">${expiryDisplay}</td>
                         <td style="color: #94a3b8; font-family: 'JetBrains Mono', monospace;">${formatQuantity(totalOpenInterest)}</td>
                     </tr>`;
                     assetsTableBody.innerHTML += row;
@@ -1162,14 +1201,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 applyAssetSearchFilter();
             })
             .catch(error => {
-                console.error('Error fetching open interest:', error);
+                // Error fetching open interest
                 
                 // Fallback to showing just prices without open interest
                 assetsTableBody.innerHTML = '';
                 // Sort symbols alphabetically
                 const sortedSymbols = Object.keys(assets).sort();
                 for (const symbol of sortedSymbols) {
-                    const currentPrice = assets[symbol].price;
+                    const assetData = assets[symbol];
+                    const currentPrice = assetData.price;
                     const color = getInstrumentColor(symbol);
                     
                     let priceColor = '#e2e8f0';
@@ -1183,9 +1223,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     previousPrices[symbol] = currentPrice;
                     
+                    // Format expiration time
+                    const timeToExpiry = assetData.time_to_expiry_seconds || 0;
+                    const expiryDisplay = formatTimeToExpiry(timeToExpiry);
+                    
                     const row = `<tr style="border-left: 4px solid ${color};">
                         <td><span class="symbol-badge" style="background-color: ${color};">${symbol}</span></td>
                         <td style="color: ${priceColor}; font-weight: 600; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(currentPrice)}</td>
+                        <td style="font-family: 'JetBrains Mono', monospace;">${expiryDisplay}</td>
                         <td style="color: #94a3b8; font-family: 'JetBrains Mono', monospace;">${formatQuantity(0)}</td>
                     </tr>`;
                     assetsTableBody.innerHTML += row;
@@ -1237,6 +1282,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!portfolio) return; // Skip if redirected
                 
                 userPortfolio = portfolio;
+                
+                // Update transactions if included in response
+                if (portfolio.transactions) {
+                    userTransactions = portfolio.transactions;
+                    updateTransactionsTable();
+                }
+                
+                // Also refresh settlements whenever portfolio refreshes
+                loadSettlements();
+                
                 cashBalance.textContent = formatNumber(portfolio.cash, 2);
                 
                 // Fetch current prices to calculate market values
@@ -1256,7 +1311,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const cashColor = '#00d4ff'; // Cash color for consistency
                         const cashItem = `<li style="border-left: 3px solid ${cashColor}; padding-left: 12px; background: rgba(0, 0, 0, 0.3);">
                             <span class="symbol-badge" style="background-color: ${cashColor}; margin-right: 8px;">CASH</span>
-                            <span style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight: 600;">$${formatNumber(portfolio.cash, 2)}</span>
+                            <span class="cash-value" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight: 600;">$${formatNumber(portfolio.cash, 2)}</span>
                         </li>`;
                         holdingsList.innerHTML += cashItem;
                         
@@ -1295,7 +1350,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }, 100); // Small delay to ensure DOM is updated
                     })
                     .catch(error => {
-                        console.error('Error fetching assets for portfolio:', error);
+                        // Error fetching assets for portfolio
                     });
             });
     }
@@ -1321,28 +1376,124 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     });
 
+    function loadSettlements() {
+        // Load settlement history from API
+        fetch('/api/settlements')
+            .then(response => {
+                if (response.status === 401) {
+                    // User session expired
+                    return null;
+                }
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(settlements => {
+                const settlementsSection = document.querySelector('.settlements-section');
+                const settlementsTableBody = document.querySelector('#settlements-table tbody');
+                
+                if (!settlements || settlements.length === 0) {
+                    // Hide settlements section if no settlements
+                    if (settlementsSection) {
+                        settlementsSection.style.display = 'none';
+                    }
+                    cachedSettlements = [];
+                    return;
+                }
+                
+                // Check if settlements data has actually changed
+                const settlementsChanged = JSON.stringify(settlements) !== JSON.stringify(cachedSettlements);
+                
+                if (!settlementsChanged) {
+                    return;
+                }
+                
+                // Update cache
+                cachedSettlements = settlements;
+                
+                // Show and populate settlements section
+                if (settlementsSection) {
+                    settlementsSection.style.display = 'block';
+                }
+                
+                if (!settlementsTableBody) {
+                    return;
+                }
+                
+                settlementsTableBody.innerHTML = '';
+                
+                // Backend already sorts by newest first (settled_at DESC)
+                settlements.forEach(settlement => {
+                    const color = getInstrumentColor(settlement.symbol);
+                    const row = document.createElement('tr');
+                    row.className = 'settlement-row';
+                    row.innerHTML = `
+                        <td style="color: #94a3b8; font-size: 11px; white-space: nowrap;">${formatCompactDateTime(new Date(settlement.settled_at).getTime())}</td>
+                        <td><span class="symbol-badge" style="background-color: ${color};">${settlement.symbol}</span></td>
+                        <td style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">${formatQuantity(settlement.quantity)}</td>
+                        <td style="color: #00d4ff; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(settlement.settlement_price)}</td>
+                        <td style="color: #7dda58; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatCurrencyLocale(settlement.settlement_value)}</td>
+                    `;
+                    settlementsTableBody.appendChild(row);
+                });
+            })
+            .catch(error => {
+                // Error loading settlements
+            });
+    }
+
     // Handle new transactions
     socket.on('transaction_added', (transaction) => {
-        userTransactions.push(transaction);
-        updateTransactionsTable();
-        
-        // Update VWAP line for this specific instrument
-        updateVWAPLine(transaction.symbol);
-    });
-
-    // Handle Global Transaction updates for Time & Sales
-    socket.on('global_transaction_update', (transaction) => {
-        addTimeAndSalesEntry(transaction);
-    });
-
-    // Handle Time and Sales updates (keep for backward compatibility)
-    socket.on('time_and_sales_update', (trade) => {
-        addTimeAndSalesEntry(trade);
+        // Filter: only add if this transaction is for the current user (or no user_id specified for backward compatibility)
+        if (!transaction.user_id || transaction.user_id === currentUserId) {
+            // Refresh from API to get the latest data (same pattern as portfolio refresh)
+            updatePortfolio();
+            
+            // Update VWAP line for this specific instrument
+            updateVWAPLine(transaction.symbol);
+        }
     });
 
     // Handle real-time performance updates
     socket.on('performance_update', () => {
         updatePerformance();
+    });
+
+    // Handle asset expiration and settlement events
+    socket.on('assets_updated', (data) => {
+        if (data.message) {
+            showNotification(data.message, 'info');
+        }
+        
+        if (data.stats && data.stats.settlement_stats) {
+            const settleStats = data.stats.settlement_stats;
+            if (settleStats.positions_settled > 0) {
+                showNotification(
+                    `${settleStats.positions_settled} position(s) settled. Total value: ${formatCurrencyLocale(settleStats.total_value_settled)}`,
+                    'success'
+                );
+            }
+        }
+        
+        // Refresh all data after asset updates - fetch assets first to cache colors
+        fetch('/api/assets')
+            .then(response => response.json())
+            .then(assets => {
+                updateAssetsTable(assets);  // This caches the colors from asset data
+                updatePortfolio();  // This will also refresh settlements
+                updatePerformance();
+            })
+            .catch(error => {
+                // Error fetching assets
+            });
+    });
+
+    // Handle portfolio refresh signal (e.g., after settlements)
+    socket.on('portfolio_refresh_needed', () => {
+        updatePortfolio();  // This will now also refresh settlements
+        updatePerformance();
+        createOrUpdatePortfoliePieChart();
     });
 
     // Auto-populate quantity based on asset selection and position
@@ -1441,7 +1592,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         await new Promise(resolve => setTimeout(resolve, 200));
                     }
                 } catch (error) {
-                    console.error(`Error selling ${symbol}:`, error);
+                    // Error selling position
                     failCount++;
                 }
             }
@@ -1577,6 +1728,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize chart system
     initializeChartSystem();
+    
+    // Load settlement history
+    loadSettlements();
+    
+    // Periodically check for new settlements (every 30 seconds as backup)
+    setInterval(() => {
+        loadSettlements();
+    }, 30000);
     
     // Set up symbol badge click handlers
     addSymbolBadgeClickHandlers();

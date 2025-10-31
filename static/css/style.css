@@ -310,7 +310,7 @@ h2 {
     }
 }
 
-.assets-section, .portfolio-section, .trade-section, .transactions-section, .performance-section, .time-and-sales-section {
+.assets-section, .portfolio-section, .trade-section, .transactions-section, .performance-section {
     background: var(--terminal-surface-light);
     padding: 20px;
     border-radius: 4px;
@@ -318,12 +318,6 @@ h2 {
     box-shadow: none;
     min-width: 0; /* Allow sections to shrink */
     overflow: hidden; /* Prevent overflow */
-}
-
-/* Time & Sales section specific styling to allow internal scrolling */
-.time-and-sales-section {
-    background: var(--terminal-surface-light);
-    overflow: visible !important;
 }
 
 /* Make Trade section sticky and always visible */
@@ -359,180 +353,6 @@ h2 {
     outline: none !important;
 }
 
-.time-and-sales-section h2 {
-    color: var(--terminal-accent);
-    margin-bottom: 15px;
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    text-shadow: 0 0 10px var(--terminal-glow);
-}
-
-#time-and-sales-container {
-    background: var(--terminal-bg);
-    border-radius: 6px;
-    border: 1px solid var(--terminal-border);
-    height: 280px;
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
-#time-and-sales-table {
-    font-size: 12px;
-    width: 100%;
-    background: transparent;
-    table-layout: fixed;
-}
-
-/* Column widths for time-and-sales table */
-#time-and-sales-table th:nth-child(1),
-#time-and-sales-table td:nth-child(1) {
-    width: 110px; /* Time column - wider to accommodate MM/DD HH:MM:SS */
-}
-
-#time-and-sales-table th:nth-child(2),
-#time-and-sales-table td:nth-child(2) {
-    width: 80px; /* Symbol column */
-}
-
-#time-and-sales-table th:nth-child(3),
-#time-and-sales-table td:nth-child(3) {
-    width: 70px; /* Side column */
-}
-
-#time-and-sales-table th:nth-child(4),
-#time-and-sales-table td:nth-child(4) {
-    width: 90px; /* Size column - wider for numbers */
-}
-
-#time-and-sales-table th:nth-child(5),
-#time-and-sales-table td:nth-child(5) {
-    width: 100px; /* Price column - wider for currency */
-}
-
-#time-and-sales-table th {
-    background: var(--terminal-surface);
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    color: var(--terminal-accent);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 11px;
-    padding: 10px 8px;
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-    border-bottom: 2px solid var(--terminal-accent);
-}
-
-
-#time-and-sales-feed tr {
-    border-bottom: 1px solid rgba(0, 255, 161, 0.1);
-    font-size: 11px;
-    font-family: 'JetBrains Mono', monospace;
-    transition: background-color 0.2s ease;
-}
-
-#time-and-sales-feed tr:hover {
-    background: rgba(0, 255, 136, 0.05);
-}
-
-#time-and-sales-feed tr.buy {
-    background: rgba(16, 185, 129, 0.1);
-    border-left: 3px solid var(--terminal-success);
-}
-
-#time-and-sales-feed tr.sell {
-    background: rgba(239, 68, 68, 0.1);
-    border-left: 3px solid var(--terminal-danger);
-}
-
-#time-and-sales-feed td {
-    padding: 5px 8px;
-    color: var(--terminal-text);
-}
-
-.time-and-sales-entry:hover {
-    background: rgba(0, 212, 255, 0.1);
-}
-
-.time-and-sales-entry.buy {
-    background: linear-gradient(90deg, rgba(0, 255, 136, 0.15) 0%, transparent 100%);
-    border-left: 3px solid var(--terminal-success);
-}
-
-.time-and-sales-entry.sell {
-    background: linear-gradient(90deg, rgba(255, 71, 87, 0.15) 0%, transparent 100%);
-    border-left: 3px solid var(--terminal-loss);
-}
-
-.ts-time {
-    color: var(--terminal-text-secondary);
-    font-size: 11px;
-}
-
-.ts-symbol {
-    color: var(--terminal-accent);
-    font-weight: 600;
-    text-align: center;
-}
-
-.ts-side {
-    font-weight: 700;
-    text-transform: uppercase;
-    text-align: center;
-    letter-spacing: 1px;
-}
-
-.ts-side.buy {
-    color: var(--terminal-success);
-    text-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
-}
-
-.ts-side.sell {
-    color: var(--terminal-loss);
-    text-shadow: 0 0 8px rgba(255, 71, 87, 0.3);
-}
-
-.ts-size {
-    color: var(--terminal-text);
-    text-align: right;
-    font-weight: 500;
-}
-
-.ts-price {
-    color: var(--terminal-accent-secondary);
-    text-align: right;
-    font-weight: 600;
-}
-
-@keyframes flashEntry {
-    0% {
-        background: rgba(0, 212, 255, 0.4);
-        transform: translateX(-10px);
-    }
-    100% {
-        transform: translateX(0);
-    }
-}
-
-/* Scrollbar styling for time and sales */
-#time-and-sales-container::-webkit-scrollbar {
-    width: 6px;
-}
-
-#time-and-sales-container::-webkit-scrollbar-track {
-    background: var(--terminal-bg);
-}
-
-#time-and-sales-container::-webkit-scrollbar-thumb {
-    background: var(--terminal-accent-secondary);
-    border-radius: 3px;
-}
-
-#time-and-sales-container::-webkit-scrollbar-thumb:hover {
-    background: var(--terminal-accent);
-}
-
 @media (max-width: 768px) {
     #transactions-table {
         font-size: 10px;
@@ -541,31 +361,6 @@ h2 {
     #transactions-table th {
         padding: 6px 4px;
         font-size: 10px;
-    }
-    
-    #time-and-sales-table {
-        font-size: 10px;
-    }
-    
-    #time-and-sales-table th {
-        padding: 6px 4px;
-        font-size: 10px;
-    }
-    
-    #time-and-sales-feed td {
-        padding: 3px 4px;
-        font-size: 10px;
-    }
-    
-    /* Prevent timestamp overflow on mobile */
-    #time-and-sales-table th:nth-child(1),
-    #time-and-sales-table td:nth-child(1) {
-        width: 95px;
-        font-size: 9px;
-        padding: 3px 2px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
     }
 }
 
@@ -793,10 +588,6 @@ td {
     overflow-x: auto; /* Allow horizontal scroll on mobile */
 }
 
-#time-and-sales-container {
-    overflow-x: auto; /* Allow horizontal scroll on mobile */
-}
-
 #asset-search {
     width: 100%;
     padding: 10px 12px;
@@ -892,6 +683,14 @@ td {
     max-height: 300px;
     overflow-y: auto;
     overflow-x: hidden;
+}
+
+.cash-value {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    display: inline-block;
 }
 
 #trade-form {
@@ -1490,6 +1289,10 @@ td {
         padding: 8px;
     }
     
+    .cash-value {
+        font-size: 11px;
+    }
+    
     /* Chart optimizations */
     .chart-container {
         padding: 10px 10px 90px 10px; /* Extra bottom padding on mobile for x-axis labels */
@@ -1523,11 +1326,6 @@ td {
         width: 100%;
         max-width: 100%;
         overflow: visible;
-    }
-    
-    /* Time & Sales optimizations */
-    #time-and-sales-container {
-        max-height: 250px;
     }
     
     /* Transactions table optimizations */
@@ -1588,6 +1386,10 @@ td {
         grid-template-columns: 1fr;
     }
     
+    .cash-value {
+        font-size: 10px;
+    }
+    
     /* Chart container adjustments for small mobile */
     .chart-container {
         height: 40vh;
@@ -1601,8 +1403,7 @@ td {
     .portfolio-section, 
     .trade-section, 
     .transactions-section, 
-    .performance-section, 
-    .time-and-sales-section {
+    .performance-section {
         padding: 12px;
     }
     
@@ -1619,17 +1420,6 @@ td {
     #assets-table th:nth-child(4),
     #assets-table td:nth-child(4) {
         display: none; /* Hide volatility and open interest on mobile */
-    }
-    
-    /* Time and sales - compact columns */
-    #time-and-sales-table th:nth-child(1),
-    #time-and-sales-table td:nth-child(1) {
-        width: 85px; /* Even narrower time column */
-        font-size: 9px; /* Smaller font for timestamps */
-        padding: 3px 2px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
     }
     
     /* Transaction table - hide total cost on very small screens */
@@ -1684,7 +1474,6 @@ td {
         gap: 10px;
     }
     
-    #time-and-sales-container,
     #transactions-container {
         max-height: 200px;
     }
@@ -1709,4 +1498,165 @@ td {
     .chart-container:hover {
         background: inherit;
     }
+}
+
+/* Notification System */
+.notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 400px;
+}
+
+.notification {
+    background: rgba(10, 14, 26, 0.98);
+    border: 1px solid #2d3748;
+    border-left: 4px solid #00ff88;
+    border-radius: 6px;
+    padding: 15px 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    animation: slideIn 0.3s ease-out;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.notification-info { border-left-color: #00d4ff; }
+.notification-success { border-left-color: #7dda58; }
+.notification-warning { border-left-color: #ff9800; }
+.notification-error { border-left-color: #f85149; }
+
+.notification-message {
+    flex: 1;
+    color: #e2e8f0;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.notification-close:hover { color: #e2e8f0; }
+
+@keyframes slideIn {
+    from { transform: translateX(400px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Settlements Section */
+.settlements-section {
+    background: var(--terminal-bg);
+    border: 1px solid var(--terminal-border);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    margin-top: 20px;
+}
+
+.settlements-section h2 {
+    color: var(--terminal-accent);
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+#settlements-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: transparent;
+}
+
+#settlements-table thead th {
+    background: var(--terminal-surface);
+    color: var(--terminal-accent);
+    padding: 10px 8px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 2px solid var(--terminal-border);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+#settlements-table tbody tr {
+    border-bottom: 1px solid var(--terminal-border);
+    transition: background-color 0.2s;
+    background: rgba(239, 68, 68, 0.05);
+    border-left: 3px solid var(--terminal-error);
+}
+
+#settlements-table tbody tr:hover { 
+    background-color: rgba(239, 68, 68, 0.1);
+}
+
+#settlements-table tbody td {
+    padding: 10px 8px;
+    font-size: 12px;
+}
+
+#settlements-container {
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid var(--terminal-border);
+    border-radius: 8px;
+    background: var(--terminal-bg);
+}
+
+#settlements-table {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#settlements-table thead th:first-child {
+    border-top-left-radius: 8px;
+}
+
+#settlements-table thead th:last-child {
+    border-top-right-radius: 8px;
+}
+
+.settlement-row { 
+    animation: fadeIn 0.3s ease-out; 
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (max-width: 768px) {
+    .notification-container {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+    .notification { padding: 12px 15px; }
+    .notification-message { font-size: 13px; }
 }

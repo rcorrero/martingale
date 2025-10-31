@@ -22,14 +22,6 @@ class Config:
     WTF_CSRF_ENABLED = True
     WTF_CSRF_TIME_LIMIT = None  # CSRF tokens don't expire (only session lifetime matters)
     
-    # reCAPTCHA configuration
-    RECAPTCHA_ENABLED = os.environ.get('RECAPTCHA_ENABLED', 'False').lower() == 'true'
-    RECAPTCHA_SITE_KEY = os.environ.get('RECAPTCHA_SITE_KEY', '')
-    RECAPTCHA_SECRET_KEY = os.environ.get('RECAPTCHA_SECRET_KEY', '')
-    # Use reCAPTCHA v2 checkbox (change to v3 if preferred)
-    RECAPTCHA_USE_SSL = True
-    RECAPTCHA_OPTIONS = {'theme': 'dark'}  # Match terminal theme
-    
     # Database configuration
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///martingale.db'
     # Fix for Heroku postgres URL
@@ -45,8 +37,14 @@ class Config:
     
     # Initial asset price
     INITIAL_ASSET_PRICE = float(os.environ.get('INITIAL_ASSET_PRICE', 100))
+    
+    # Asset lifecycle settings
+    MIN_ACTIVE_ASSETS = int(os.environ.get('MIN_ACTIVE_ASSETS', 16))  # Minimum active assets to maintain
+    EXPIRATION_CHECK_INTERVAL = int(os.environ.get('EXPIRATION_CHECK_INTERVAL', 60))  # Check every 60 seconds
+    CLEANUP_OLD_ASSETS_DAYS = int(os.environ.get('CLEANUP_OLD_ASSETS_DAYS', 30))  # Remove assets older than 30 days
 
-    # Asset configuration - Random fictitious symbols
+    # Legacy ASSETS config - now used only as fallback/migration
+    # New assets are created dynamically with expiration dates
     ASSETS = {
         'XQR': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.05},
         'ZLN': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.06},

@@ -4,13 +4,28 @@ A paper trading web application that simulates real-time asset trading with virt
 
 ## Features
 
-- **Real-time Trading**: Buy and sell simulated assets (BTC, ETH) with live price updates
+- **Real-time Trading**: Buy and sell simulated assets with live price updates
+- **Expiring Assets**: Assets have predefined expiration dates (1 day to 1 month)
+- **Automatic Settlement**: Positions automatically settled at expiration with cash returned
+- **Dynamic Asset Pool**: New assets automatically created to replace expired ones
 - **Interactive Charts**: Real-time price history charts with VWAP indicators
 - **Portfolio Management**: Track holdings, cash balance, and trading history
 - **Performance Analytics**: Comprehensive P&L tracking with realized/unrealized gains
 - **User Authentication**: Secure login system with persistent user portfolios
-- **Security Features**: Password strength requirements, rate limiting, CAPTCHA protection
 - **Responsive Design**: Works seamlessly on desktop and mobile devices
+
+## What's New: Expiring Assets System
+
+The platform now supports **dynamic expiring assets** that simulate real-world futures contracts:
+
+- ✅ **Random Asset Generation**: New assets created with 3-letter symbols (e.g., "KLP", "FGH")
+- ✅ **Variable Expirations**: Each asset expires between 1 day and 1 month from creation
+- ✅ **Automatic Settlement**: Holdings settled at final price upon expiration
+- ✅ **Auto-Replacement**: System maintains minimum of 10 active assets
+- ✅ **Settlement History**: Complete audit trail of all settlements
+- ✅ **No Manual Intervention**: Fully automated lifecycle management
+
+See [EXPIRING_ASSETS_SUMMARY.md](EXPIRING_ASSETS_SUMMARY.md) for detailed documentation.
 
 ## Installation
 
@@ -62,19 +77,11 @@ The application uses environment variables for configuration. Copy `.env.example
 - `FLASK_ENV`: Set to 'development' or 'production'
 - `FLASK_DEBUG`: Enable/disable debug mode
 - `FLASK_PORT`: Port number for the application
-- `INITIAL_CASH`: Starting cash amount for new users
-- `RECAPTCHA_ENABLED`: Enable/disable CAPTCHA verification (optional)
-- `RECAPTCHA_SITE_KEY`: Google reCAPTCHA site key (if enabled)
-- `RECAPTCHA_SECRET_KEY`: Google reCAPTCHA secret key (if enabled)
-
-### Optional: Enable CAPTCHA
-
-To protect against bot registrations, you can enable Google reCAPTCHA:
-
-1. Get reCAPTCHA keys from: https://www.google.com/recaptcha/admin
-2. Set `RECAPTCHA_ENABLED=true` in your `.env` file
-3. Add your `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY`
-4. See [docs/RECAPTCHA_SETUP.md](docs/RECAPTCHA_SETUP.md) for detailed instructions
+- `INITIAL_CASH`: Starting cash amount for new users (default: 100000)
+- `INITIAL_ASSET_PRICE`: Starting price for new assets (default: 100)
+- `MIN_ACTIVE_ASSETS`: Minimum active assets to maintain (default: 10)
+- `EXPIRATION_CHECK_INTERVAL`: How often to check for expirations in seconds (default: 60)
+- `CLEANUP_OLD_ASSETS_DAYS`: Remove expired assets after N days (default: 30)
 
 ## Usage
 
@@ -86,56 +93,103 @@ To protect against bot registrations, you can enable Google reCAPTCHA:
 
 ## Technology Stack
 
-- **Backend**: Flask, Flask-SocketIO, Flask-Login
+- **Backend**: Flask, Flask-SocketIO, Flask-Login, Flask-SQLAlchemy
 - **Frontend**: HTML5, CSS3, JavaScript (ES6+)
 - **Real-time**: WebSocket communications via SocketIO
 - **Charts**: Chart.js with real-time streaming
-- **Authentication**: Flask-Login with password hashing
-- **Data Storage**: JSON files (easily replaceable with database)
+- **Authentication**: Flask-Login with scrypt password hashing
+- **Database**: SQLite (development) / PostgreSQL (production)
+- **Asset Management**: Custom lifecycle manager with automatic settlement
 
 ## Project Structure
 
 ```
 martingale/
-├── app.py                 # Main application file
-├── config.py             # Configuration settings
-├── requirements.txt      # Python dependencies
-├── .env.example         # Environment variables template
-├── .gitignore           # Git ignore rules
-├── README.md            # Project documentation
+├── app.py                      # Main application file
+├── config.py                   # Configuration settings
+├── models.py                   # Database models (User, Portfolio, Asset, Settlement)
+├── asset_manager.py            # Asset lifecycle management
+├── price_client.py             # Price service client with fallback
+├── price_service.py            # Standalone price generation service
+├── requirements.txt            # Python dependencies
+├── .env.example               # Environment variables template
+├── .gitignore                 # Git ignore rules
+├── README.md                  # Project documentation
+├── EXPIRING_ASSETS_SUMMARY.md # Expiring assets documentation
+├── MIGRATION_EXPIRING_ASSETS.md # Migration guide
+├── SECURITY.md                # Security documentation
+├── test_expiring_assets.py    # Test suite for asset lifecycle
 ├── static/
 │   ├── css/
-│   │   └── style.css    # Application styles
+│   │   └── style.css          # Application styles
 │   └── js/
-│       └── main.js      # Frontend JavaScript
+│       └── main.js            # Frontend JavaScript
 └── templates/
-    ├── index.html       # Main trading interface
-    ├── login.html       # Login page
-    └── register.html    # Registration page
+    ├── index.html             # Main trading interface
+    ├── login.html             # Login page
+    └── register.html          # Registration page
 ```
 
 ## Development
 
-### Adding New Assets
+### Testing the System
 
-To add new tradeable assets, update the `ASSETS` configuration in `config.py`:
+Run the test suite to verify asset lifecycle:
 
-```python
-ASSETS = {
-    'BTC': {'price': 50000, 'volatility': 0.02},
-    'ETH': {'price': 3000, 'volatility': 0.03},
-    'AAPL': {'price': 150, 'volatility': 0.015},  # New asset
-}
+```bash
+python test_expiring_assets.py
 ```
 
-### Database Migration
+Tests include:
+- Asset creation with random parameters
+- Expiration mechanics
+- Settlement processing
+- Pool maintenance
+- Full lifecycle integration
 
-For production use, consider replacing JSON file storage with a proper database:
+### Monitoring Asset Lifecycle
 
-1. Add database configuration to `config.py`
-2. Create database models
-3. Update data persistence functions
-4. Add database migrations
+Check asset statistics:
+```bash
+curl http://localhost:5000/api/assets/summary
+```
+
+View active assets:
+```bash
+curl http://localhost:5000/api/assets | jq
+```
+
+Watch expiration logs:
+```bash
+tail -f martingale.log | grep -i "expir"
+```
+
+### Customizing Asset Generation
+
+Edit `Asset.create_new_asset()` in `models.py`:
+
+```python
+# Change expiration range (default 1-30 days)
+days_to_expiry = random.randint(7, 14)  # 1-2 weeks only
+
+# Change volatility range (default 0.1%-20%)
+volatility = random.uniform(0.01, 0.10)  # 1%-10% only
+
+# Change symbol length (default 3)
+symbol = Asset.generate_symbol(length=4)  # 4-letter symbols
+```
+
+### Database Operations
+
+Access Flask shell for manual operations:
+```bash
+flask shell
+>>> from models import Asset, Settlement
+>>> Asset.query.filter_by(is_active=True).count()
+10
+>>> Asset.query.filter_by(is_active=False).count()
+0
+```
 
 ## Contributing
 
@@ -158,7 +212,6 @@ For production use, consider replacing JSON file storage with a proper database:
 - ✅ CSRF protection on all forms
 - ✅ SQL injection prevention via SQLAlchemy ORM
 - ✅ XSS protection with secure cookie configuration
-- ✅ CAPTCHA for registration (optional, configurable)
 
 ### For Production Deployment
 1. **Set strong SECRET_KEY** in environment variables

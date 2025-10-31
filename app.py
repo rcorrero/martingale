@@ -17,7 +17,8 @@ import re
 from datetime import datetime, timedelta
 from config import config
 from price_client import HybridPriceService
-from models import db, User, Portfolio, Transaction, PriceData
+from models import db, User, Portfolio, Transaction, PriceData, Asset, Settlement
+from asset_manager import AssetManager
 
 # Configure logging
 if os.environ.get('FLASK_ENV') == 'production':
@@ -146,13 +147,11 @@ def unauthorized():
 def get_user_portfolio(user):
     """Get or create user portfolio with default values."""
     if not user.portfolio:
-        # Create new portfolio with assets from configuration
+        # Create new portfolio - holdings start empty
+        # Assets are added dynamically as user trades
         portfolio = Portfolio(user_id=user.id, cash=app.config['INITIAL_CASH'])
-        holdings = {symbol: 0 for symbol in app.config['ASSETS'].keys()}
-        position_info = {symbol: {'total_cost': 0, 'total_quantity': 0} for symbol in app.config['ASSETS'].keys()}
-        
-        portfolio.set_holdings(holdings)
-        portfolio.set_position_info(position_info)
+        portfolio.set_holdings({})
+        portfolio.set_position_info({})
         
         db.session.add(portfolio)
         db.session.commit()
@@ -185,53 +184,14 @@ def add_global_transaction(transaction_data):
         db.session.add(transaction)
         db.session.commit()
 
-def get_global_transactions(limit=50):
-    """Get recent global transactions from database."""
-    transactions = Transaction.query.order_by(Transaction.timestamp.desc()).limit(limit).all()
-    return [{
-        'timestamp': int(t.timestamp),  # t.timestamp is already a float in milliseconds
-        'username': t.user.username,
-        'symbol': t.symbol,
-        'type': t.type,  # Use 'type' not 'transaction_type'
-        'quantity': t.quantity,
-        'price': t.price,
-        'total_cost': t.total_cost
-    } for t in transactions]
-
 # Initialize price service (hybrid mode - uses API if available, fallback otherwise)
 price_service = HybridPriceService(
     assets_config=app.config['ASSETS'],
     api_url=os.environ.get('PRICE_SERVICE_URL', 'http://localhost:5001')
 )
 
-def update_prices():
-    """Get updated prices from price service and emit to clients."""
-    while True:
-        try:
-            # Get current prices from the price service
-            current_prices = price_service.get_current_prices()
-            
-            if current_prices:
-                # Emit individual price updates for charts
-                for symbol, price_data in current_prices.items():
-                    if 'price' in price_data and 'last_update' in price_data:
-                        socketio.emit('price_chart_update', {
-                            'symbol': symbol,
-                            'time': price_data['last_update'],
-                            'price': price_data['price']
-                        })
-                
-                # Emit all current prices for the table
-                all_current_prices = {s: {'price': d['price']} for s, d in current_prices.items()}
-                socketio.emit('price_update', all_current_prices)
-                
-                # Emit performance update for all users
-                socketio.emit('performance_update')
-            
-        except Exception as e:
-            logger.error(f"Error in price update loop: {e}")
-        
-        time.sleep(app.config['PRICE_UPDATE_INTERVAL'])
+# Initialize asset manager
+asset_manager = AssetManager(app.config, price_service, socketio)
 
 @app.route('/')
 @login_required
@@ -347,6 +307,7 @@ def get_portfolio():
     portfolio = get_user_portfolio(current_user)
     
     return jsonify({
+        'user_id': current_user.id,
         'cash': portfolio.cash,
         'holdings': portfolio.get_holdings(),
         'position_info': portfolio.get_position_info(),
@@ -373,9 +334,13 @@ def get_performance():
     
     logger.info(f"Starting portfolio calculation - cash: {portfolio_cash}")
     
-    # Get current prices from price service
+    # Get current prices from price service (only active assets)
     try:
         current_prices = price_service.get_current_prices()
+        # Filter to only active assets
+        active_assets = Asset.query.filter_by(is_active=True).all()
+        active_symbols = {a.symbol for a in active_assets}
+        current_prices = {s: p for s, p in current_prices.items() if s in active_symbols}
         logger.info(f"Current prices for performance calculation: {current_prices}")
     except Exception as e:
         logger.error(f"Error getting current prices: {e}")
@@ -390,9 +355,10 @@ def get_performance():
         logger.error(f"Portfolio cash is NaN: {portfolio_cash}")
         total_portfolio_value = 100000.0  # Default to initial cash
     
-    # Calculate current market value of holdings and unrealized P&L
+    # Calculate current market value of holdings and unrealized P&L (only for active assets)
     for symbol, quantity in holdings.items():
         try:
+            # Skip if asset is not active (expired assets have been settled)
             if quantity > 0 and symbol in current_prices:
                 current_price = float(current_prices[symbol]['price']) if current_prices[symbol]['price'] is not None else 0.0
                 quantity = float(quantity) if quantity is not None else 0.0
@@ -481,24 +447,77 @@ def get_transactions():
 
 @app.route('/api/assets', methods=['GET'])
 def get_assets():
-    """Get current asset prices."""
+    """Get current asset prices and expiration info for active assets."""
+    # Get active assets from database (only those not yet expired)
+    now = datetime.utcnow()
+    active_assets = Asset.query.filter_by(is_active=True).filter(Asset.expires_at > now).all()
+    
+    # Get current prices from price service
     current_prices = price_service.get_current_prices()
-    return jsonify(current_prices)
+    
+    # Combine asset info with current prices
+    assets_data = {}
+    for asset in active_assets:
+        price = current_prices.get(asset.symbol, {}).get('price', asset.current_price)
+        assets_data[asset.symbol] = {
+            'price': price,
+            'expires_at': asset.expires_at.isoformat(),
+            'time_to_expiry_seconds': asset.time_to_expiry().total_seconds() if asset.time_to_expiry() else 0,
+            'initial_price': asset.initial_price,
+            'volatility': asset.volatility,
+            'color': asset.color,
+            'created_at': asset.created_at.isoformat()
+        }
+    
+    return jsonify(assets_data)
 
 @app.route('/api/assets/history', methods=['GET'])
 def get_assets_history():
-    """Get price history for all assets."""
-    history = price_service.get_price_history()
-    return jsonify(history)
+    """Get price history for active assets."""
+    # Get active assets from database
+    active_assets = Asset.query.filter_by(is_active=True).all()
+    active_symbols = [a.symbol for a in active_assets]
+    
+    # Get full history from price service
+    all_history = price_service.get_price_history()
+    
+    # Filter to only active assets
+    active_history = {
+        symbol: history 
+        for symbol, history in all_history.items() 
+        if symbol in active_symbols
+    }
+    
+    return jsonify(active_history)
+
+@app.route('/api/assets/summary', methods=['GET'])
+def get_assets_summary():
+    """Get summary of asset lifecycle status."""
+    summary = asset_manager.get_asset_summary()
+    return jsonify(summary)
+
+@app.route('/api/settlements', methods=['GET'])
+@login_required
+def get_settlements():
+    """Get settlement history for current user."""
+    settlements = Settlement.query.filter_by(user_id=current_user.id).order_by(Settlement.settled_at.desc()).limit(50).all()
+    
+    return jsonify([{
+        'symbol': s.symbol,
+        'quantity': s.quantity,
+        'settlement_price': s.settlement_price,
+        'settlement_value': s.settlement_value,
+        'settled_at': s.settled_at.isoformat()
+    } for s in settlements])
 
 @app.route('/api/open-interest', methods=['GET'])
 def get_open_interest():
     """Calculate total open interest for each asset by summing all users' holdings."""
-    open_interest = {}
+    # Get active assets
+    active_assets = Asset.query.filter_by(is_active=True).all()
     
-    # Initialize open interest for all assets
-    for symbol in app.config['ASSETS'].keys():
-        open_interest[symbol] = 0
+    # Initialize open interest for all active assets
+    open_interest = {asset.symbol: 0 for asset in active_assets}
     
     # Sum holdings across all users
     portfolios = Portfolio.query.all()
@@ -509,12 +528,6 @@ def get_open_interest():
                 open_interest[symbol] += quantity
     
     return jsonify(open_interest)
-
-@app.route('/api/global-transactions', methods=['GET'])
-def get_global_transactions_api():
-    """Get the last 50 global transactions for Time & Sales display."""
-    transactions = get_global_transactions(50)
-    return jsonify(transactions[::-1])  # Most recent first
 
 @socketio.on('trade')
 def handle_trade(data):
@@ -529,10 +542,20 @@ def handle_trade(data):
         trade_type = data['type']
         quantity = float(data['quantity'])
         
+        # Validate asset is active
+        asset = Asset.query.filter_by(symbol=symbol, is_active=True).first()
+        if not asset:
+            emit('trade_confirmation', {
+                'success': False, 
+                'message': f'Asset {symbol} is not available for trading (may have expired)', 
+                'symbol': symbol
+            })
+            return
+        
         # Get current price from price service
         current_prices = price_service.get_current_prices()
         if symbol not in current_prices:
-            emit('trade_confirmation', {'success': False, 'message': f'Unknown asset: {symbol}', 'symbol': symbol})
+            emit('trade_confirmation', {'success': False, 'message': f'Price not available for {symbol}', 'symbol': symbol})
             return
             
         price = current_prices[symbol]['price']
@@ -575,17 +598,6 @@ def handle_trade(data):
                 db.session.add(transaction)
                 db.session.commit()
                 
-                # Create transaction data for global feed
-                transaction_data = {
-                    'timestamp': timestamp,
-                    'username': current_user.username,
-                    'symbol': symbol,
-                    'type': 'buy',
-                    'quantity': quantity,
-                    'price': price,
-                    'total_cost': cost
-                }
-                
                 emit('trade_confirmation', {'success': True, 'message': f'Bought {quantity} {symbol}', 'symbol': symbol, 'type': 'buy', 'quantity': quantity})
                 emit('transaction_added', {
                     'timestamp': timestamp,
@@ -593,11 +605,9 @@ def handle_trade(data):
                     'type': 'buy',
                     'quantity': quantity,
                     'price': price,
-                    'total_cost': cost
+                    'total_cost': cost,
+                    'user_id': current_user.id
                 })
-                
-                # Broadcast global transaction update to all clients for Time & Sales
-                socketio.emit('global_transaction_update', transaction_data)
             else:
                 emit('trade_confirmation', {'success': False, 'message': 'Insufficient funds', 'symbol': symbol, 'type': 'buy', 'quantity': quantity})
                 
@@ -632,17 +642,6 @@ def handle_trade(data):
                 db.session.add(transaction)
                 db.session.commit()
                 
-                # Create transaction data for global feed
-                transaction_data = {
-                    'timestamp': timestamp,
-                    'username': current_user.username,
-                    'symbol': symbol,
-                    'type': 'sell',
-                    'quantity': quantity,
-                    'price': price,
-                    'total_cost': cost
-                }
-                
                 emit('trade_confirmation', {'success': True, 'message': f'Sold {quantity} {symbol}', 'symbol': symbol, 'type': 'sell', 'quantity': quantity})
                 emit('transaction_added', {
                     'timestamp': timestamp,
@@ -650,11 +649,9 @@ def handle_trade(data):
                     'type': 'sell',
                     'quantity': quantity,
                     'price': price,
-                    'total_cost': cost
+                    'total_cost': cost,
+                    'user_id': current_user.id
                 })
-                
-                # Broadcast global transaction update to all clients for Time & Sales
-                socketio.emit('global_transaction_update', transaction_data)
             else:
                 emit('trade_confirmation', {'success': False, 'message': 'Insufficient holdings', 'symbol': symbol, 'type': 'sell', 'quantity': quantity})
         
@@ -674,16 +671,51 @@ def handle_trade(data):
 def update_prices():
     """Get updated prices from price service and emit to clients."""
     try:
-        current_prices = price_service.get_current_prices()
-        socketio.emit('price_update', current_prices)
-        
-        # Emit individual price updates for charts
-        for symbol, data in current_prices.items():
-            socketio.emit('price_chart_update', {
-                'symbol': symbol,
-                'time': data.get('last_update', time.time() * 1000),
-                'price': data['price']
-            })
+        with app.app_context():
+            # Get active assets and sync with price service
+            # Double-check they're actually active and not expired
+            now = datetime.utcnow()
+            active_assets = Asset.query.filter_by(is_active=True).filter(Asset.expires_at > now).all()
+            
+            # Sync price service with active assets from database
+            price_service.sync_assets_from_db(active_assets)
+            
+            # Get current prices from the price service
+            current_prices = price_service.get_current_prices()
+            
+            # Enrich price data with expiration info
+            enriched_prices = {}
+            for asset in active_assets:
+                if asset.symbol in current_prices:
+                    price = current_prices[asset.symbol]['price']
+                    
+                    # Update database with current price
+                    asset.current_price = price
+                    
+                    enriched_prices[asset.symbol] = {
+                        'price': price,
+                        'expires_at': asset.expires_at.isoformat(),
+                        'time_to_expiry_seconds': asset.time_to_expiry().total_seconds() if asset.time_to_expiry() else 0,
+                        'initial_price': asset.initial_price,
+                        'volatility': asset.volatility,
+                        'color': asset.color,
+                        'created_at': asset.created_at.isoformat()
+                    }
+            
+            # Commit price updates to database
+            db.session.commit()
+            
+            socketio.emit('price_update', enriched_prices)
+            
+            # Emit individual price updates for charts
+            for symbol, data in current_prices.items():
+                # Only emit for active assets
+                if any(a.symbol == symbol for a in active_assets):
+                    socketio.emit('price_chart_update', {
+                        'symbol': symbol,
+                        'time': data.get('last_update', time.time() * 1000),
+                        'price': data['price']
+                    })
     except Exception as e:
         logger.error(f"Price update error: {e}")
 
@@ -694,9 +726,46 @@ def price_update_thread():
         time.sleep(app.config.get('PRICE_UPDATE_INTERVAL', 1))  # Update every second
         update_prices()
 
-# Start the price update thread
+# Background thread for expiration checking
+def expiration_check_thread():
+    """Background thread to check for and process expired assets."""
+    while True:
+        time.sleep(app.config.get('EXPIRATION_CHECK_INTERVAL', 60))  # Check every minute by default
+        
+        try:
+            with app.app_context():
+                logger.info("Checking for expired assets...")
+                stats = asset_manager.process_expirations()
+                
+                if stats['expired_assets'] > 0:
+                    logger.info(f"Processed {stats['expired_assets']} expired assets")
+                    logger.info(f"Settled {stats.get('settlement_stats', {}).get('positions_settled', 0)} positions")
+                    
+                    # Give database a moment to ensure all commits are complete
+                    time.sleep(0.5)
+                    
+                    # Notify all connected clients about settlements
+                    socketio.emit('assets_updated', {
+                        'message': f"{stats['expired_assets']} assets expired and settled",
+                        'stats': stats
+                    }, broadcast=True)
+                    
+                    # Signal all clients to refresh their portfolio data
+                    socketio.emit('portfolio_refresh_needed', broadcast=True)
+                    
+                    logger.info("Emitted settlement notifications to all clients")
+                
+        except Exception as e:
+            logger.error(f"Error in expiration check thread: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+# Start background threads
 price_thread = threading.Thread(target=price_update_thread, daemon=True)
 price_thread.start()
+
+expiration_thread = threading.Thread(target=expiration_check_thread, daemon=True)
+expiration_thread.start()
 
 if __name__ == '__main__':
     # Initialize database tables
@@ -704,8 +773,20 @@ if __name__ == '__main__':
         try:
             db.create_all()
             logger.info("Database tables created")
+            
+            # Initialize asset pool if empty
+            active_assets = Asset.query.filter_by(is_active=True).count()
+            if active_assets == 0:
+                logger.info("No active assets found, initializing asset pool...")
+                new_assets = asset_manager.initialize_asset_pool()
+                logger.info(f"Created {len(new_assets)} initial assets")
+            else:
+                logger.info(f"Found {active_assets} active assets in database")
+            
         except Exception as e:
             logger.error(f"Database initialization error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
     
     # Get port from environment or use default
     port = int(os.environ.get('PORT') or os.environ.get('FLASK_PORT', 5000))
