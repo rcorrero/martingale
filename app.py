@@ -18,14 +18,23 @@ from price_client import HybridPriceService
 from models import db, User, Portfolio, Transaction, PriceData
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('martingale.log'),
-        logging.StreamHandler()
-    ]
-)
+if os.environ.get('FLASK_ENV') == 'production':
+    # Production logging - only to stdout for Heroku
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[logging.StreamHandler()]
+    )
+else:
+    # Development logging - to file and stdout
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler('martingale.log'),
+            logging.StreamHandler()
+        ]
+    )
 logger = logging.getLogger(__name__)
 
 def create_app(config_name='default'):
@@ -196,14 +205,23 @@ def register():
             flash('Username already exists')
             return render_template('register.html', form=form)
         
-        # Create new user
-        user = User(username=username)
-        user.set_password(form.password.data)
-        db.session.add(user)
-        db.session.commit()
-        
-        login_user(user)
-        return redirect(url_for('index'))
+        try:
+            # Create new user
+            user = User(username=username)
+            user.set_password(form.password.data)
+            db.session.add(user)
+            db.session.commit()
+            
+            # Create portfolio for the new user
+            get_user_portfolio(user)
+            
+            login_user(user)
+            return redirect(url_for('index'))
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Registration error: {e}")
+            flash('Registration failed. Please try again.')
+            return render_template('register.html', form=form)
     
     return render_template('register.html', form=form)
 
@@ -579,18 +597,17 @@ price_thread.start()
 if __name__ == '__main__':
     # Initialize database tables
     with app.app_context():
-        db.create_all()
-        logger.info("Database tables created")
-    
-if __name__ == '__main__':
-    # Start price update thread
-    price_thread = threading.Thread(target=update_prices)
-    price_thread.daemon = True
-    price_thread.start()
+        try:
+            db.create_all()
+            logger.info("Database tables created")
+        except Exception as e:
+            logger.error(f"Database initialization error: {e}")
     
     # Get port from environment or use default
     port = int(os.environ.get('PORT') or os.environ.get('FLASK_PORT', 5000))
     debug = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
+    
+    logger.info(f"Starting application on port {port}, debug={debug}")
     
     # Run with appropriate settings for production vs development
     socketio.run(app, debug=debug, port=port, host='0.0.0.0')
