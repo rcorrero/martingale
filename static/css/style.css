@@ -101,6 +101,8 @@ body {
     min-height: 100vh;
     font-size: 13px;
     line-height: 1.4;
+    overflow-y: auto; /* Ensure vertical scrolling works */
+    overflow-x: hidden; /* Prevent horizontal page scroll */
 }
 
 .container {
@@ -112,7 +114,7 @@ body {
     border: 2px solid var(--terminal-border);
     width: 100%;
     box-sizing: border-box;
-    overflow-x: hidden;
+    overflow-x: auto; /* Allow horizontal scroll if needed */
 }
 
 h1, h2 {
@@ -240,7 +242,7 @@ h2 {
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
-    overflow-x: hidden; /* Prevent horizontal overflow */
+    overflow: visible; /* Allow content to be visible and scrollable */
 }
 
 @media (min-width: 1600px) {
@@ -1381,10 +1383,20 @@ td {
     /* General mobile optimizations */
     body {
         font-size: 14px;
+        padding: 10px;
+        overflow-y: auto !important; /* Force vertical scrolling */
+        overflow-x: hidden !important; /* Prevent horizontal scroll */
     }
     
     .container {
         padding: 10px;
+        max-width: 100%;
+        overflow-x: visible;
+        overflow-y: visible;
+    }
+    
+    .main-content {
+        overflow: visible !important;
     }
     
     /* Header optimizations */
@@ -1470,6 +1482,8 @@ td {
     /* Chart optimizations */
     .chart-container {
         padding: 10px;
+        height: 50vh; /* Smaller height on mobile */
+        min-height: 300px;
     }
     
     .chart-controls-header {
@@ -1484,6 +1498,19 @@ td {
     .add-symbol-btn, .clear-chart-btn {
         font-size: 11px;
         padding: 6px 10px;
+    }
+    
+    /* Ensure charts container doesn't lock scrolling */
+    #charts-container {
+        grid-template-columns: 1fr !important;
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .charts-section {
+        width: 100%;
+        max-width: 100%;
+        overflow: visible;
     }
     
     /* Time & Sales optimizations */
@@ -1517,6 +1544,14 @@ td {
 
 /* Small Mobile Devices (max-width: 480px) */
 @media (max-width: 480px) {
+    body {
+        padding: 5px;
+    }
+    
+    .container {
+        padding: 8px;
+    }
+    
     /* Header adjustments */
     .header {
         padding: 12px;
@@ -1539,6 +1574,13 @@ td {
     /* Make performance grid single column */
     .performance-grid {
         grid-template-columns: 1fr;
+    }
+    
+    /* Chart container adjustments for small mobile */
+    .chart-container {
+        height: 40vh;
+        min-height: 250px;
+        padding: 8px;
     }
     
     /* Reduce section padding */
