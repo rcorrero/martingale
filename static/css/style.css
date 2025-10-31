@@ -768,9 +768,18 @@ td {
 #assets-container {
     max-height: 300px;
     overflow-y: auto;
+    overflow-x: auto; /* Allow horizontal scroll on mobile */
     background: var(--terminal-bg);
     border-radius: 6px;
     border: 1px solid var(--terminal-border);
+}
+
+#transactions-container {
+    overflow-x: auto; /* Allow horizontal scroll on mobile */
+}
+
+#time-and-sales-container {
+    overflow-x: auto; /* Allow horizontal scroll on mobile */
 }
 
 #asset-search {
@@ -1326,4 +1335,306 @@ td {
 .footer-copyright p {
     margin: 0;
     opacity: 0.8;
+}
+
+/* ============================================
+   MOBILE RESPONSIVE ENHANCEMENTS
+   ============================================ */
+
+/* Tablet Devices (768px - 1024px) */
+@media (max-width: 1024px) {
+    .container {
+        padding: 15px;
+    }
+    
+    .header h1 {
+        font-size: 28px;
+    }
+    
+    .main-content {
+        gap: 15px;
+    }
+    
+    .trade-section {
+        position: static; /* Remove sticky on tablet */
+    }
+    
+    #holdings-list {
+        font-size: 12px;
+    }
+}
+
+/* Mobile Devices (max-width: 768px) */
+@media (max-width: 768px) {
+    /* General mobile optimizations */
+    body {
+        font-size: 14px;
+    }
+    
+    .container {
+        padding: 10px;
+    }
+    
+    /* Header optimizations */
+    .header {
+        padding: 15px;
+    }
+    
+    .header h1 {
+        font-size: 24px;
+        margin: 0;
+    }
+    
+    .user-info {
+        font-size: 12px;
+        gap: 8px;
+    }
+    
+    .logout-btn, .about-btn {
+        padding: 6px 12px;
+        font-size: 11px;
+    }
+    
+    /* Section headers */
+    h2 {
+        font-size: 16px;
+        margin-bottom: 12px;
+    }
+    
+    /* Trade form optimizations */
+    #trade-form {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 12px;
+    }
+    
+    #trade-form label {
+        font-size: 10px;
+    }
+    
+    #trade-form input, #trade-form select {
+        font-size: 14px;
+        padding: 10px;
+    }
+    
+    .trade-buttons {
+        grid-column: 1;
+        display: flex;
+        gap: 8px;
+    }
+    
+    .buy-btn, .sell-btn {
+        flex: 1;
+        font-size: 13px;
+        padding: 12px;
+    }
+    
+    /* Assets table optimizations */
+    #assets-table {
+        font-size: 11px;
+    }
+    
+    #assets-table th,
+    #assets-table td {
+        padding: 8px 4px;
+        font-size: 11px;
+    }
+    
+    .symbol-badge {
+        font-size: 10px;
+        padding: 3px 6px;
+    }
+    
+    /* Portfolio section */
+    #holdings-list {
+        font-size: 11px;
+        max-height: 250px;
+    }
+    
+    #holdings-list li {
+        padding: 8px;
+    }
+    
+    /* Chart optimizations */
+    .chart-container {
+        padding: 10px;
+    }
+    
+    .chart-controls-header {
+        padding: 8px;
+    }
+    
+    .chart-symbol-input {
+        font-size: 12px;
+        padding: 6px;
+    }
+    
+    .add-symbol-btn, .clear-chart-btn {
+        font-size: 11px;
+        padding: 6px 10px;
+    }
+    
+    /* Time & Sales optimizations */
+    #time-and-sales-container {
+        max-height: 250px;
+    }
+    
+    /* Transactions table optimizations */
+    #transactions-container {
+        max-height: 250px;
+    }
+    
+    /* Performance grid - stack vertically */
+    .performance-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+    
+    .performance-item {
+        padding: 10px;
+    }
+    
+    .performance-label {
+        font-size: 10px;
+    }
+    
+    .performance-value {
+        font-size: 16px;
+    }
+}
+
+/* Small Mobile Devices (max-width: 480px) */
+@media (max-width: 480px) {
+    /* Header adjustments */
+    .header {
+        padding: 12px;
+    }
+    
+    .header h1 {
+        font-size: 20px;
+    }
+    
+    .time-display {
+        display: none; /* Hide time display on very small screens */
+    }
+    
+    .user-info {
+        flex-wrap: wrap;
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    /* Make performance grid single column */
+    .performance-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Reduce section padding */
+    .assets-section, 
+    .portfolio-section, 
+    .trade-section, 
+    .transactions-section, 
+    .performance-section, 
+    .time-and-sales-section {
+        padding: 12px;
+    }
+    
+    /* Make tables more compact */
+    #assets-table th,
+    #assets-table td {
+        padding: 6px 2px;
+        font-size: 10px;
+    }
+    
+    /* Hide less critical columns on very small screens */
+    #assets-table th:nth-child(3),
+    #assets-table td:nth-child(3),
+    #assets-table th:nth-child(4),
+    #assets-table td:nth-child(4) {
+        display: none; /* Hide volatility and open interest on mobile */
+    }
+    
+    /* Time and sales - compact columns */
+    #time-and-sales-table th:nth-child(1),
+    #time-and-sales-table td:nth-child(1) {
+        width: 90px; /* Narrower time column */
+    }
+    
+    /* Transaction table - hide total cost on very small screens */
+    #transactions-table th:last-child,
+    #transactions-table td:last-child {
+        display: none;
+    }
+    
+    /* Compact buttons */
+    .buy-btn, .sell-btn {
+        font-size: 12px;
+        padding: 10px;
+    }
+    
+    /* Portfolio chart smaller */
+    .portfolio-chart-section {
+        width: 100%;
+        max-width: 200px;
+    }
+    
+    #portfolio-pie-chart {
+        max-width: 200px;
+        max-height: 200px;
+    }
+    
+    /* Footer adjustments */
+    .footer-disclaimer {
+        padding: 10px;
+        font-size: 11px;
+    }
+    
+    .footer-disclaimer p {
+        font-size: 11px;
+    }
+    
+    .footer-copyright {
+        font-size: 10px;
+    }
+}
+
+/* Landscape orientation optimizations for mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+    .header {
+        padding: 10px 15px;
+    }
+    
+    .time-info {
+        display: none;
+    }
+    
+    .main-content {
+        gap: 10px;
+    }
+    
+    #time-and-sales-container,
+    #transactions-container {
+        max-height: 200px;
+    }
+}
+
+/* Touch-friendly improvements */
+@media (hover: none) and (pointer: coarse) {
+    /* Larger touch targets */
+    button, .btn, .logout-btn, .about-btn {
+        min-height: 44px;
+        padding: 12px;
+    }
+    
+    input, select {
+        min-height: 44px;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    /* Remove hover effects on touch devices */
+    tr:hover,
+    .performance-item:hover,
+    .chart-container:hover {
+        background: inherit;
+    }
 }
