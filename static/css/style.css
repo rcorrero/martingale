@@ -1,0 +1,1273 @@
+/* Trading Terminal Theme */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+/* Global outline removal for all form elements */
+* {
+    outline: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-focus-ring-color: transparent !important;
+}
+
+input, select, button, textarea {
+    outline: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+}
+
+input:focus, select:focus, button:focus, textarea:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* Specific targeting for trade form elements */
+.trade-section,
+.trade-section *,
+.trade-section input,
+.trade-section select,
+.trade-section button,
+#trade-form,
+#trade-form *,
+#trade-form input,
+#trade-form select,
+#trade-form button,
+#asset-input,
+#quantity-input {
+    outline: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    -webkit-focus-ring-color: transparent !important;
+    -webkit-tap-highlight-color: transparent !important;
+}
+
+.trade-section input,
+.trade-section select,
+.trade-section button,
+#trade-form input,
+#trade-form select,
+#trade-form button,
+#asset-input,
+#quantity-input {
+    border: 1px solid var(--terminal-border) !important;
+}
+
+.trade-section:focus,
+.trade-section *:focus,
+.trade-section input:focus,
+.trade-section select:focus,
+.trade-section button:focus,
+#trade-form:focus,
+#trade-form *:focus,
+#trade-form input:focus,
+#trade-form select:focus,
+#trade-form button:focus,
+#asset-input:focus,
+#quantity-input:focus {
+    outline: none !important;
+    border: 2px solid var(--terminal-border) !important;
+    box-shadow: 0 0 8px var(--terminal-glow) !important;
+}
+
+:root {
+    /* VS Code Dark High Contrast Theme Colors */
+    --terminal-bg: #000000;                    /* Pure black background */
+    --terminal-surface: #0c0c0c;              /* Slightly lighter black for surfaces */
+    --terminal-surface-light: #1a1a1a;       /* Lighter surface for elevated elements */
+    --terminal-border: #6fc3df;              /* Bright cyan for borders */
+    --terminal-text: #ffffff;                /* Pure white text */
+    --terminal-text-secondary: #c5c5c5;      /* Light gray for secondary text */
+    --terminal-accent: #00d4aa;              /* Bright teal accent */
+    --terminal-accent-secondary: #569cd6;    /* VS Code blue */
+    --terminal-warning: #ffcc02;             /* Bright yellow */
+    --terminal-danger: #f85149;              /* Bright red */
+    --terminal-success: #7dda58;             /* Bright green */
+    --terminal-profit: #7dda58;              /* Bright green for profits */
+    --terminal-loss: #f85149;                /* Bright red for losses */
+    --terminal-shadow: rgba(0, 0, 0, 0.8);   /* Darker shadows */
+    --terminal-glow: rgba(111, 195, 223, 0.3); /* Cyan glow */
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'JetBrains Mono', 'Consolas', 'Monaco', 'Courier New', monospace;
+    background: var(--terminal-bg);
+    color: var(--terminal-text);
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.container {
+    max-width: 100vw;
+    margin: auto;
+    background: var(--terminal-surface);
+    padding: 20px;
+    border-radius: 4px;
+    border: 2px solid var(--terminal-border);
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+}
+
+h1, h2 {
+    color: var(--terminal-accent);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: 600;
+    text-shadow: 0 0 10px var(--terminal-glow);
+    margin-bottom: 15px;
+}
+
+h1 {
+    font-size: 24px;
+    border-bottom: 2px solid var(--terminal-accent);
+    padding-bottom: 10px;
+}
+
+h2 {
+    font-size: 16px;
+    margin-bottom: 12px;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--terminal-border);
+}
+
+.time-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
+    justify-content: center;
+}
+
+.time-display {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--terminal-surface);
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--terminal-border);
+    min-width: 140px;
+}
+
+.time-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.time-label {
+    color: var(--terminal-text-secondary);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.time-value {
+    color: var(--terminal-accent-secondary);
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-size: 12px;
+    color: var(--terminal-text-secondary);
+}
+
+.logout-btn {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, var(--terminal-danger), #dc2626);
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.logout-btn:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+    transform: translateY(-1px);
+}
+
+.about-btn {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, var(--terminal-success), #22c55e);
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(125, 218, 88, 0.3);
+}
+
+.about-btn:hover {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    box-shadow: 0 0 15px rgba(125, 218, 88, 0.4);
+    transform: translateY(-1px);
+}
+
+.main-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 15px;
+    width: 100%;
+    max-width: 100%;
+}
+
+@media (min-width: 1600px) {
+    .main-content {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 1599px) and (min-width: 1200px) {
+    .main-content {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+    }
+}
+
+@media (max-width: 1199px) and (min-width: 768px) {
+    .main-content {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    
+    .performance-section {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+    }
+    
+    .time-info {
+        justify-content: flex-start;
+        flex: none;
+        width: 100%;
+    }
+    
+    .time-display {
+        min-width: 120px;
+    }
+    
+    .main-content {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    #charts-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .performance-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .trade-section {
+        top: 10px; /* Reduce top spacing on mobile */
+    }
+}
+
+@media (max-width: 480px) {
+    .performance-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.assets-section, .portfolio-section, .trade-section, .transactions-section, .performance-section, .time-and-sales-section {
+    background: var(--terminal-surface-light);
+    padding: 20px;
+    border-radius: 4px;
+    border: none; /* REMOVED BORDER COMPLETELY */
+    box-shadow: none;
+    min-width: 0; /* Allow sections to shrink */
+    overflow: hidden; /* Prevent overflow */
+}
+
+/* Time & Sales section specific styling to allow internal scrolling */
+.time-and-sales-section {
+    background: var(--terminal-surface-light);
+    overflow: visible !important;
+}
+
+/* Make Trade section sticky and always visible */
+.trade-section {
+    position: sticky;
+    top: 20px;
+    z-index: 100;
+    border: 2px solid var(--terminal-border);
+    backdrop-filter: none;
+}
+
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.1); }
+}
+
+#trade-form {
+    /* Use standard form styling to match the application theme */
+    background: var(--terminal-surface);
+    border: 1px solid var(--terminal-border);
+    border-radius: 4px;
+    padding: 15px;
+    box-shadow: none;
+    outline: none !important;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    align-items: center;
+}
+
+#trade-form:focus {
+    outline: none !important;
+}
+
+.time-and-sales-section h2 {
+    color: var(--terminal-accent);
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px var(--terminal-glow);
+}
+
+#time-and-sales-container {
+    background: var(--terminal-bg);
+    border-radius: 6px;
+    border: 1px solid var(--terminal-border);
+    height: 280px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#time-and-sales-table {
+    font-size: 12px;
+    width: 100%;
+    background: transparent;
+    table-layout: fixed;
+}
+
+#time-and-sales-table th {
+    background: var(--terminal-surface);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    color: var(--terminal-accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 11px;
+    padding: 10px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    border-bottom: 2px solid var(--terminal-accent);
+}
+
+
+#time-and-sales-feed tr {
+    border-bottom: 1px solid rgba(0, 255, 161, 0.1);
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    transition: background-color 0.2s ease;
+}
+
+#time-and-sales-feed tr:hover {
+    background: rgba(0, 255, 136, 0.05);
+}
+
+#time-and-sales-feed tr.buy {
+    background: rgba(16, 185, 129, 0.1);
+    border-left: 3px solid var(--terminal-success);
+}
+
+#time-and-sales-feed tr.sell {
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid var(--terminal-danger);
+}
+
+#time-and-sales-feed td {
+    padding: 5px 8px;
+    color: var(--terminal-text);
+}
+
+.time-and-sales-entry:hover {
+    background: rgba(0, 212, 255, 0.1);
+}
+
+.time-and-sales-entry.buy {
+    background: linear-gradient(90deg, rgba(0, 255, 136, 0.15) 0%, transparent 100%);
+    border-left: 3px solid var(--terminal-success);
+}
+
+.time-and-sales-entry.sell {
+    background: linear-gradient(90deg, rgba(255, 71, 87, 0.15) 0%, transparent 100%);
+    border-left: 3px solid var(--terminal-loss);
+}
+
+.ts-time {
+    color: var(--terminal-text-secondary);
+    font-size: 11px;
+}
+
+.ts-symbol {
+    color: var(--terminal-accent);
+    font-weight: 600;
+    text-align: center;
+}
+
+.ts-side {
+    font-weight: 700;
+    text-transform: uppercase;
+    text-align: center;
+    letter-spacing: 1px;
+}
+
+.ts-side.buy {
+    color: var(--terminal-success);
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+}
+
+.ts-side.sell {
+    color: var(--terminal-loss);
+    text-shadow: 0 0 8px rgba(255, 71, 87, 0.3);
+}
+
+.ts-size {
+    color: var(--terminal-text);
+    text-align: right;
+    font-weight: 500;
+}
+
+.ts-price {
+    color: var(--terminal-accent-secondary);
+    text-align: right;
+    font-weight: 600;
+}
+
+@keyframes flashEntry {
+    0% {
+        background: rgba(0, 212, 255, 0.4);
+        transform: translateX(-10px);
+    }
+    100% {
+        transform: translateX(0);
+    }
+}
+
+/* Scrollbar styling for time and sales */
+#time-and-sales-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+#time-and-sales-container::-webkit-scrollbar-track {
+    background: var(--terminal-bg);
+}
+
+#time-and-sales-container::-webkit-scrollbar-thumb {
+    background: var(--terminal-accent-secondary);
+    border-radius: 3px;
+}
+
+#time-and-sales-container::-webkit-scrollbar-thumb:hover {
+    background: var(--terminal-accent);
+}
+
+@media (max-width: 768px) {
+    #transactions-table {
+        font-size: 10px;
+    }
+    
+    #transactions-table th {
+        padding: 6px 4px;
+        font-size: 10px;
+    }
+    
+    #time-and-sales-table {
+        font-size: 10px;
+    }
+    
+    #time-and-sales-table th {
+        padding: 6px 4px;
+        font-size: 10px;
+    }
+    
+    #time-and-sales-feed td {
+        padding: 3px 4px;
+        font-size: 10px;
+    }
+}
+
+.portfolio-content {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.holdings-section {
+    flex: 1;
+    min-width: 0;
+}
+
+.portfolio-chart-section {
+    flex: 0 0 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.portfolio-chart-section h3 {
+    color: var(--terminal-accent);
+    margin-bottom: 10px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.portfolio-chart-container {
+    width: 180px;
+    height: 180px;
+    position: relative;
+    background: var(--terminal-bg);
+    border-radius: 50%;
+    padding: 10px;
+    border: 1px solid var(--terminal-border);
+    box-shadow: 
+        0 0 20px rgba(0, 0, 0, 0.5),
+        inset 0 0 20px rgba(0, 255, 136, 0.05);
+}
+
+.portfolio-chart-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+@media (max-width: 768px) {
+    .portfolio-content {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .portfolio-chart-section {
+        flex: none;
+        margin-top: 15px;
+    }
+}
+
+.performance-section {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    color: var(--terminal-text);
+    grid-column: 1 / -1;
+    margin-bottom: 15px;
+    border: 1px solid var(--terminal-accent);
+    box-shadow: 
+        0 0 20px rgba(0, 255, 136, 0.1),
+        0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.performance-section h2 {
+    color: var(--terminal-accent);
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.performance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.performance-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    min-width: 0;
+    transition: all 0.3s ease;
+}
+
+.performance-item:hover {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: var(--terminal-accent);
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+}
+
+.performance-label {
+    font-size: 11px;
+    color: var(--terminal-text-secondary);
+    margin-bottom: 5px;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.performance-value {
+    font-size: 16px;
+    font-weight: 600;
+    word-break: break-all;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.performance-value.positive {
+    color: var(--terminal-profit);
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+}
+
+.performance-value.negative {
+    color: var(--terminal-loss);
+    text-shadow: 0 0 8px rgba(255, 71, 87, 0.3);
+}
+
+#transactions-container {
+    max-height: 300px;
+    overflow-y: auto;
+    background: var(--terminal-bg);
+    border-radius: 6px;
+    border: 1px solid var(--terminal-border);
+}
+
+#transactions-table {
+    font-size: 12px;
+    width: 100%;
+    background: transparent;
+}
+
+#transactions-table th {
+    background: var(--terminal-surface);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    color: var(--terminal-accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 11px;
+    padding: 10px 8px;
+}
+
+.transaction-buy {
+    background: rgba(16, 185, 129, 0.1);
+    border-left: 3px solid var(--terminal-success);
+}
+
+.transaction-sell {
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid var(--terminal-danger);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+th, td {
+    text-align: left;
+    padding: 8px;
+    border-bottom: 1px solid var(--terminal-border);
+    border-right: 1px solid var(--terminal-border);
+}
+
+th {
+    background: var(--terminal-surface);
+    color: var(--terminal-text);
+    border: 2px solid var(--terminal-border);
+    font-weight: 600;
+}
+
+td {
+    color: var(--terminal-text);
+}
+
+.symbol-badge {
+    display: inline-block;
+    color: var(--terminal-bg);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    text-shadow: none;
+    min-width: 40px;
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 1px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.symbol-badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+    border-color: var(--terminal-border);
+    filter: brightness(1.1);
+}
+
+#assets-container {
+    max-height: 300px;
+    overflow-y: auto;
+    background: var(--terminal-bg);
+    border-radius: 6px;
+    border: 1px solid var(--terminal-border);
+}
+
+#assets-table {
+    font-size: 12px;
+    width: 100%;
+    background: transparent;
+    border-radius: 6px;
+    border-collapse: separate !important;  /* Override global border-collapse */
+    border-spacing: 0;  /* Remove spacing between cells */
+    overflow: hidden;  /* Ensures rounded corners are visible */
+}
+
+/* Round the corners of the first and last cells in the header */
+#assets-table th:first-child {
+    border-top-left-radius: 6px;
+}
+
+#assets-table th:last-child {
+    border-top-right-radius: 6px;
+}
+
+/* Round the corners of the first and last cells in the last row */
+#assets-table tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 6px;
+}
+
+#assets-table tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 6px;
+}
+
+#assets-table th {
+    background: var(--terminal-surface);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    color: var(--terminal-accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 11px;
+    padding: 10px 8px;
+}
+
+#assets-table tbody tr {
+    transition: all 0.2s ease;
+    background: var(--terminal-bg);
+}
+
+#assets-table tbody tr:hover {
+    background: var(--terminal-surface);
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.1);
+}
+
+#holdings-list li {
+    margin: 8px 0;
+    background: var(--terminal-bg);
+    padding: 12px;
+    border-radius: 6px;
+    list-style: none;
+    border: 1px solid var(--terminal-border);
+    transition: all 0.3s ease;
+}
+
+#holdings-list li:hover {
+    background: var(--terminal-surface);
+    border-color: var(--terminal-accent);
+}
+
+#holdings-list {
+    padding-left: 0;
+}
+
+#trade-form {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+#trade-form input, #trade-form select {
+    padding: 10px !important;
+    border-radius: 4px !important;
+    border: 2px solid var(--terminal-border) !important;
+    background: var(--terminal-bg) !important;
+    color: var(--terminal-text) !important;
+    flex: 1;
+    min-width: 140px;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 12px !important;
+    transition: all 0.2s ease;
+    outline: none !important;
+    box-shadow: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+}
+
+#trade-form input:focus, #trade-form select:focus {
+    border-color: var(--terminal-border) !important;
+    box-shadow: 0 0 8px var(--terminal-glow) !important;
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.2) !important;
+    outline: none !important;
+}
+
+#asset-input {
+    font-weight: 600;
+    text-transform: uppercase;
+    min-width: 180px;
+    background: var(--terminal-bg);
+    border: 1px solid var(--terminal-border);
+    color: var(--terminal-text);
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+}
+
+#quantity-input {
+    min-width: 100px;
+    background: var(--terminal-bg);
+    border: 1px solid var(--terminal-border);
+    color: var(--terminal-text);
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+}
+
+#trade-form button {
+    padding: 8px 16px;
+    border: 1px solid var(--terminal-border);
+    border-radius: 4px;
+    cursor: pointer;
+    background: var(--terminal-surface);
+    color: var(--terminal-text);
+    white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.2s ease;
+    outline: none;
+    box-shadow: none;
+}
+
+#trade-form button[value="buy"] {
+    background: var(--terminal-surface) !important;
+    border: 1px solid var(--terminal-success) !important;
+    color: var(--terminal-success) !important;
+}
+
+#trade-form button[value="buy"]:hover {
+    background: var(--terminal-success) !important;
+    color: var(--terminal-text) !important;
+    border-color: var(--terminal-success) !important;
+}
+
+#trade-form button:focus {
+    outline: none;
+    border-color: var(--terminal-accent);
+}
+
+#trade-form button[value="sell"] {
+    background: var(--terminal-surface) !important;
+    border: 2px solid var(--terminal-danger) !important;
+    color: var(--terminal-danger) !important;
+}
+
+#trade-form button[value="sell"]:hover {
+    background: var(--terminal-danger) !important;
+    color: var(--terminal-text) !important;
+    border-color: var(--terminal-danger) !important;
+}
+
+#trade-form #sell-all-btn {
+    grid-column: 1 / -1; /* Span full width */
+    margin-top: 5px;
+    background: var(--terminal-surface) !important;
+    border: 2px solid var(--terminal-danger) !important;
+    color: var(--terminal-danger) !important;
+}
+
+#trade-form #sell-all-btn:hover {
+    background: var(--terminal-danger) !important;
+    color: var(--terminal-text) !important;
+    border-color: var(--terminal-danger) !important;
+}
+
+#trade-form #sell-all-btn:active {
+    background: var(--terminal-danger) !important;
+    color: var(--terminal-text) !important;
+    transform: translateY(1px);
+}
+
+#trade-message {
+    margin-top: 10px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+}
+
+.charts-section {
+    margin-top: 20px;
+    grid-column: 1 / -1;
+    width: 100%;
+    overflow: visible !important;  /* Force override of any parent overflow hidden */
+}
+
+.chart-controls {
+    background: var(--terminal-surface-light);
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid var(--terminal-border);
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.chart-control-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.chart-controls label {
+    color: var(--terminal-text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    min-width: 120px;
+}
+
+.chart-controls select {
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--terminal-border);
+    background: var(--terminal-bg);
+    color: var(--terminal-text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+}
+
+.chart-controls select:focus {
+    border-color: var(--terminal-accent);
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+}
+
+.chart-control-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    background: linear-gradient(135deg, var(--terminal-accent-secondary), #0ea5e9);
+    color: var(--terminal-bg);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    outline: none;
+}
+
+.chart-control-btn:hover {
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+    transform: translateY(-1px);
+}
+
+.chart-control-btn:active {
+    transform: translateY(0);
+}
+
+.chart-controls-header {
+    background: var(--terminal-surface);
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid var(--terminal-border);
+    margin-bottom: 10px;
+}
+
+.chart-symbol-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.chart-symbol-input {
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 2px solid var(--terminal-border);
+    background: var(--terminal-bg);
+    color: var(--terminal-text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    outline: none;
+    min-width: 120px;
+}
+
+.chart-symbol-input:focus {
+    border-color: var(--terminal-border);
+    box-shadow: 0 0 8px var(--terminal-glow);
+}
+
+.add-symbol-btn, .clear-chart-btn {
+    padding: 6px 12px;
+    border: 2px solid var(--terminal-border);
+    border-radius: 4px;
+    background: var(--terminal-surface);
+    color: var(--terminal-text);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.clear-chart-btn {
+    border-color: var(--terminal-warning);
+    color: var(--terminal-warning);
+}
+
+.add-symbol-btn:hover {
+    background: var(--terminal-accent);
+    color: var(--terminal-bg);
+    border-color: var(--terminal-accent);
+    box-shadow: 0 0 8px var(--terminal-glow);
+}
+
+.clear-chart-btn:hover {
+    background: var(--terminal-warning);
+    color: var(--terminal-bg);
+    border-color: var(--terminal-warning);
+    box-shadow: 0 0 8px rgba(255, 204, 2, 0.4);
+}
+
+.chart-symbols-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    min-height: 20px;
+}
+
+.chart-symbol-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--terminal-text);
+}
+
+.remove-symbol-btn {
+    background: var(--terminal-surface);
+    border: 1px solid var(--terminal-danger);
+    color: var(--terminal-danger);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    padding: 0;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    outline: none;
+}
+
+.remove-symbol-btn:hover {
+    background: var(--terminal-danger);
+    color: var(--terminal-text);
+    box-shadow: 0 0 4px rgba(248, 81, 73, 0.4);
+}
+
+#charts-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;  /* Ensure chart labels can show */
+}
+
+.chart-container {
+    position: relative;
+    height: 80vh;  /* Increased height from 60vh to 80vh for much taller charts */
+    width: 100%;
+    max-width: 100%;
+    background: var(--terminal-surface-light);
+    border-radius: 8px;
+    padding: 15px 15px 60px 15px;  /* Even more bottom padding */
+    box-shadow: 
+        0 4px 6px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    box-sizing: border-box;
+    overflow: visible;  /* Allow labels to show outside container */
+    margin-bottom: 25px;  /* More margin for breathing room */
+    border: 1px solid var(--terminal-border);
+}
+
+.chart-container h3 {
+    text-shadow: 0 0 10px var(--terminal-glow);
+    margin-bottom: 15px;  /* More space after header */
+}
+
+.chart-container canvas {
+    max-width: 100% !important;
+    width: 100% !important;
+    height: calc(100% - 100px) !important;  /* Use fixed height calculation instead of auto */
+    max-height: calc(100% - 100px) !important;
+}
+
+.price-display {
+    position: absolute;
+    top: 50px;
+    right: 15px;
+    background: rgba(10, 14, 26, 0.95);
+    padding: 10px 14px;
+    border-radius: 6px;
+    box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.5),
+        0 0 20px rgba(0, 255, 136, 0.1);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+    border: 1px solid var(--terminal-border);
+    z-index: 10;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.price-display .current-price {
+    color: var(--terminal-accent);
+    margin-bottom: 4px;
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+}
+
+.price-display .vwap-price {
+    color: var(--terminal-accent-secondary);
+    font-size: 11px;
+    text-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+}
+
+/* Scrollbar styling for terminal theme */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--terminal-bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--terminal-border);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--terminal-accent);
+}
+
+/* Custom input placeholders */
+::placeholder {
+    color: var(--terminal-text-secondary);
+    opacity: 0.7;
+}
+
+/* Footer Styling */
+.footer {
+    background: var(--terminal-surface);
+    border-top: 2px solid var(--terminal-border);
+    margin-top: 40px;
+    padding: 20px 0;
+    text-align: center;
+}
+
+.footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.footer-disclaimer {
+    margin-bottom: 15px;
+    padding: 15px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 6px;
+    color: var(--terminal-text);
+}
+
+.footer-disclaimer p {
+    margin: 0;
+    font-size: 14px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.footer-disclaimer strong {
+    color: #ef4444;
+    text-shadow: 0 0 5px rgba(239, 68, 68, 0.5);
+}
+
+.footer-copyright {
+    color: var(--terminal-text-secondary);
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.footer-copyright p {
+    margin: 0;
+    opacity: 0.8;
+}

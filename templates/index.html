@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Martingale</title>
+    
+    <!-- Favicon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Martingale</h1>
+            <div class="time-info">
+                <div class="time-display">
+                    <div class="time-row">
+                        <span class="time-label">UTC:</span>
+                        <span id="utc-time" class="time-value">--:--:--</span>
+                    </div>
+                    <div class="time-row">
+                        <span class="time-label">LOCAL:</span>
+                        <span id="local-time" class="time-value">--:--:--</span>
+                    </div>
+                </div>
+            </div>
+            <div class="user-info">
+                <span>{{ current_user.username }}</span>
+                <a href="{{ url_for('about') }}" class="about-btn">About</a>
+                <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="performance-section">
+                <h2>Account Performance</h2>
+                <div class="performance-grid">
+                    <div class="performance-item">
+                        <span class="performance-label">Portfolio Value</span>
+                        <span class="performance-value" id="portfolio-value">$0.00</span>
+                    </div>
+                    <div class="performance-item">
+                        <span class="performance-label">Total P&L</span>
+                        <span class="performance-value" id="total-pnl">$0.00</span>
+                    </div>
+                    <div class="performance-item">
+                        <span class="performance-label">Total Return</span>
+                        <span class="performance-value" id="total-return">0.00%</span>
+                    </div>
+                    <div class="performance-item">
+                        <span class="performance-label">Realized P&L</span>
+                        <span class="performance-value" id="realized-pnl">$0.00</span>
+                    </div>
+                    <div class="performance-item">
+                        <span class="performance-label">Unrealized P&L</span>
+                        <span class="performance-value" id="unrealized-pnl">$0.00</span>
+                    </div>
+                    <div class="performance-item">
+                        <span class="performance-label">Available Cash</span>
+                        <span class="performance-value" id="available-cash">$0.00</span>
+                    </div>
+                </div>
+            </div>
+            <div class="assets-section">
+                <h2>Assets</h2>
+                <div id="assets-container">
+                    <table id="assets-table">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Price</th>
+                                <th>Open Interest</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Asset prices will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="portfolio-section">
+                <h2>Portfolio</h2>
+                <p style="display: none;">Cash: $<span id="cash-balance"></span></p>
+                <div class="portfolio-content">
+                    <div class="holdings-section">
+                        <ul id="holdings-list">
+                            <!-- Holdings will be populated by JavaScript -->
+                        </ul>
+                    </div>
+                    <div class="portfolio-chart-section">
+                        <h3>Allocation</h3>
+                        <div class="portfolio-chart-container">
+                            <canvas id="portfolio-pie-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="transactions-section">
+                <h2>Transaction History</h2>
+                <div id="transactions-container">
+                    <table id="transactions-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Symbol</th>
+                                <th>Type</th>
+                                <th>Quantity</th>
+                                <th>Price</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="trade-section">
+                <h2>Trade</h2>
+                <form id="trade-form">
+                    <input type="text" id="asset-input" placeholder="Enter symbol" list="asset-suggestions">
+                    <datalist id="asset-suggestions">
+                    </datalist>
+                    <input type="number" id="quantity-input" placeholder="QUANTITY" min="0" step="any">
+                    <button type="submit" name="trade-type" value="buy">Buy</button>
+                    <button type="submit" name="trade-type" value="sell">Sell</button>
+                    <button type="button" id="sell-all-btn">Sell All Positions</button>
+                </form>
+                <p id="trade-message"></p>
+            </div>
+            <div class="time-and-sales-section">
+                <h2>Time & Sales</h2>
+                <div id="time-and-sales-container">
+                    <table id="time-and-sales-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Symbol</th>
+                                <th>Side</th>
+                                <th>Size</th>
+                                <th>Price</th>
+                            </tr>
+                        </thead>
+                        <tbody id="time-and-sales-feed">
+                            <!-- Real-time trades will appear here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="charts-section">
+            <h2>Price History</h2>
+            <div class="chart-controls">
+                <div class="chart-control-row">
+                    <label for="chart-count">NUMBER OF CHARTS:</label>
+                    <select id="chart-count">
+                        <option value="1">1</option>
+                        <option value="2" selected>2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                    </select>
+                </div>
+                <div class="chart-control-row">
+                    <button id="add-chart-btn" class="chart-control-btn">Add New Chart</button>
+                    <button id="clear-all-charts-btn" class="chart-control-btn">Clear All Charts</button>
+                </div>
+            </div>
+            <div id="charts-container">
+                <!-- Charts will be generated here -->
+            </div>
+        </div>
+    </div>
+    
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-disclaimer">
+                <p><strong>⚠️ DISCLAIMER:</strong> This is a paper trading platform for educational purposes only. All prices are simulated and do not reflect real market values. No actual money or securities are involved in any transactions.</p>
+            </div>
+            <div class="footer-copyright">
+                <p>&copy; 2025 Richard Correro. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-streaming@2.0.0/dist/chartjs-plugin-streaming.min.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About - Martingale</title>
+    
+    <!-- Favicon -->
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body {
+            padding-bottom: 200px; /* Add space for footer */
+        }
+        
+        .about-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 40px;
+            background: var(--terminal-surface);
+            border: 2px solid var(--terminal-border);
+            border-radius: 8px;
+            box-shadow: 0 4px 20px var(--terminal-shadow);
+        }
+        
+        .about-container h1 {
+            color: var(--terminal-accent);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 30px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .about-content h2 {
+            color: var(--terminal-success);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 16px;
+        }
+        
+        .about-content p {
+            color: var(--terminal-text);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        
+        .about-content ul {
+            color: var(--terminal-text);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            padding-left: 20px;
+        }
+        
+        .about-content li {
+            margin-bottom: 8px;
+            color: var(--terminal-text-secondary);
+        }
+        
+        .about-content strong {
+            color: var(--terminal-accent);
+        }
+        
+        .about-nav {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--terminal-border);
+        }
+        
+        .about-nav a {
+            color: var(--terminal-accent);
+            text-decoration: none;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            margin: 0 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .about-nav a:hover {
+            color: var(--terminal-success);
+            text-decoration: underline;
+        }
+        
+        .disclaimer-box {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid var(--terminal-danger);
+            border-radius: 6px;
+            padding: 20px;
+            margin: 30px 0;
+        }
+        
+        .disclaimer-box h3 {
+            color: var(--terminal-danger);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        
+        .disclaimer-box p {
+            color: var(--terminal-text);
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+        
+        /* Auth page footer styling */
+        .auth-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--terminal-surface);
+            border-top: 2px solid var(--terminal-border);
+            padding: 15px 0;
+            text-align: center;
+        }
+        
+        .auth-footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        .auth-footer-disclaimer {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 6px;
+            color: var(--terminal-text);
+            font-size: 12px;
+        }
+        
+        .auth-footer-disclaimer strong {
+            color: #ef4444;
+        }
+        
+        .auth-footer-copyright {
+            color: var(--terminal-text-secondary);
+            font-size: 11px;
+            margin: 0;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="about-container">
+        <h1>About Martingale</h1>
+        
+        <div class="about-content">
+            <p><strong>Martingale</strong> is a paper trading platform designed for educational purposes, providing a realistic simulation of financial markets without the risk of actual monetary loss.</p>
+            
+            <h2>What is Paper Trading?</h2>
+            <p>Paper trading, also known as virtual trading or simulated trading, allows users to practice trading strategies using simulated money in real-time market conditions. It's an essential tool for learning how financial markets work and developing trading skills.</p>
+            
+            <h2>Key Features</h2>
+            <ul>
+                <li><strong>Real-Time Price Simulation:</strong> Live market data simulation with realistic price movements</li>
+                <li><strong>Portfolio Management:</strong> Track your virtual holdings, cash balance, and performance</li>
+                <li><strong>Trading History:</strong> Complete transaction logs and time & sales data</li>
+                <li><strong>Interactive Charts:</strong> Multiple chart views with technical analysis capabilities</li>
+                <li><strong>Multi-User Support:</strong> Individual user accounts with persistent portfolios</li>
+                <li><strong>Risk-Free Learning:</strong> Practice trading strategies without financial consequences</li>
+            </ul>
+            
+            <h2>Technology Stack</h2>
+            <p>Built with modern web technologies including <strong>Flask</strong> (Python web framework), <strong>Socket.IO</strong> (real-time communication), <strong>Chart.js</strong> (data visualization), and a custom terminal-inspired UI design.</p>
+            
+            <h2>Educational Purpose</h2>
+            <p>This platform is specifically designed for educational use, helping users understand:</p>
+            <ul>
+                <li>How financial markets operate</li>
+                <li>Portfolio management principles</li>
+                <li>Risk assessment and trading psychology</li>
+                <li>Technical analysis and chart reading</li>
+                <li>The importance of diversification</li>
+            </ul>
+            
+            <div class="disclaimer-box">
+                <h3>⚠️ Important Disclaimer</h3>
+                <p>This is a paper trading platform for educational purposes only. All prices are simulated and do not reflect real market values. No actual money or securities are involved in any transactions.</p>
+                <p>This platform should not be used as the sole basis for making real investment decisions. Always consult with qualified financial professionals before making actual investments.</p>
+            </div>
+            
+            <div class="about-nav">
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('index') }}">Trading Platform</a>
+                    <a href="{{ url_for('logout') }}">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}">Login</a>
+                    <a href="{{ url_for('register') }}">Register</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <footer class="auth-footer">
+        <div class="auth-footer-content">
+            <div class="auth-footer-disclaimer">
+                <p><strong>⚠️ DISCLAIMER:</strong> This is a paper trading platform for educational purposes only. All prices are simulated and do not reflect real market values. No actual money or securities are involved in any transactions.</p>
+            </div>
+            <div class="auth-footer-copyright">
+                <p>&copy; 2025 Richard Correro. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

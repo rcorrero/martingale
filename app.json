@@ -1,0 +1,33 @@
+{
+  "name": "Martingale Paper Trading Platform",
+  "description": "A paper trading platform for educational purposes with real-time price simulation",
+  "repository": "https://github.com/your-username/martingale",
+  "logo": "https://raw.githubusercontent.com/your-username/martingale/main/static/favicon-32x32.png",
+  "keywords": ["python", "flask", "trading", "education", "socketio", "realtime"],
+  "env": {
+    "SECRET_KEY": {
+      "description": "A secret key for verifying the integrity of signed cookies",
+      "generator": "secret"
+    },
+    "FLASK_ENV": {
+      "description": "Flask environment",
+      "value": "production"
+    },
+    "INITIAL_CASH": {
+      "description": "Initial cash amount for new users",
+      "value": "100000"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "hobby"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "stack": "heroku-22"
+}
