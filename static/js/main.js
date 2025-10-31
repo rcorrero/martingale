@@ -1106,6 +1106,9 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('price_update', (assets) => {
         updateAssetsTable(assets);
         
+        // Update portfolio holdings with new prices
+        updatePortfolio();
+        
         // Update performance as prices change to reflect current unrealized P&L
         updatePerformance();
         
