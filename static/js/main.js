@@ -522,7 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fetch('/api/assets')
             .then(response => response.json())
             .then(assets => {
-                availableAssets = Object.keys(assets);
+                availableAssets = Object.keys(assets).sort(); // Sort alphabetically
                 createInitialCharts();
             });
     }
@@ -1035,7 +1035,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 openInterestData = openInterest;
                 
                 assetsTableBody.innerHTML = '';
-                for (const symbol in assets) {
+                // Sort symbols alphabetically
+                const sortedSymbols = Object.keys(assets).sort();
+                for (const symbol of sortedSymbols) {
                     const currentPrice = assets[symbol].price;
                     const color = getInstrumentColor(symbol);
                     
@@ -1072,7 +1074,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Fallback to showing just prices without open interest
                 assetsTableBody.innerHTML = '';
-                for (const symbol in assets) {
+                // Sort symbols alphabetically
+                const sortedSymbols = Object.keys(assets).sort();
+                for (const symbol of sortedSymbols) {
                     const currentPrice = assets[symbol].price;
                     const color = getInstrumentColor(symbol);
                     
@@ -1110,7 +1114,9 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(response => response.json())
         .then(assets => {
             assetSuggestions.innerHTML = '';
-            for (const symbol in assets) {
+            // Sort symbols alphabetically
+            const sortedSymbols = Object.keys(assets).sort();
+            for (const symbol of sortedSymbols) {
                 const option = document.createElement('option');
                 option.value = symbol;
                 assetSuggestions.appendChild(option);
