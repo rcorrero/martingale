@@ -374,13 +374,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <td style="color: #00d4ff; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(trade.price)}</td>
         `;
         
-        if (isInitialLoad) {
-            // For initial loading, append to bottom since backend data is already sorted newest first
-            timeAndSalesFeed.appendChild(row);
-        } else {
-            // For real-time updates, add to the top (most recent first)
-            timeAndSalesFeed.insertBefore(row, timeAndSalesFeed.firstChild);
-        }
+        // Always add to the top (most recent first) since backend data is already sorted newest first
+        timeAndSalesFeed.insertBefore(row, timeAndSalesFeed.firstChild);
         
         // Remove old entries if we exceed the maximum
         while (timeAndSalesFeed.children.length > maxTimeAndSalesEntries) {
@@ -474,19 +469,18 @@ document.addEventListener('DOMContentLoaded', () => {
         fetch('/api/performance')
             .then(response => response.json())
             .then(performance => {
-                // Update portfolio value
-                portfolioValueEl.textContent = formatCurrencyLocale(performance.total_portfolio_value);
+                console.log('Performance data received:', performance);
                 
-                // Update cash
-                availableCashEl.textContent = formatCurrencyLocale(performance.cash);
+                // Update portfolio value
+                portfolioValueEl.textContent = formatCurrencyLocale(performance.portfolio_value);
                 
                 // Update total P&L with color coding
                 totalPnlEl.textContent = formatCurrencyLocale(performance.total_pnl);
                 totalPnlEl.className = 'performance-value ' + (performance.total_pnl >= 0 ? 'positive' : 'negative');
                 
                 // Update total return with color coding
-                totalReturnEl.textContent = formatPercentage(performance.total_return_percent);
-                totalReturnEl.className = 'performance-value ' + (performance.total_return_percent >= 0 ? 'positive' : 'negative');
+                totalReturnEl.textContent = formatPercentage(performance.total_return);
+                totalReturnEl.className = 'performance-value ' + (performance.total_return >= 0 ? 'positive' : 'negative');
                 
                 // Update realized P&L with color coding
                 realizedPnlEl.textContent = formatCurrencyLocale(performance.realized_pnl);
@@ -495,9 +489,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Update unrealized P&L with color coding
                 unrealizedPnlEl.textContent = formatCurrencyLocale(performance.unrealized_pnl);
                 unrealizedPnlEl.className = 'performance-value ' + (performance.unrealized_pnl >= 0 ? 'positive' : 'negative');
+                
+                // Get cash from portfolio API since it's not in performance response
+                fetch('/api/portfolio')
+                    .then(response => response.json())
+                    .then(portfolio => {
+                        availableCashEl.textContent = formatCurrencyLocale(portfolio.cash);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching portfolio for cash:', error);
+                    });
             })
             .catch(error => {
                 console.error('Error fetching performance data:', error);
+                // Set fallback values to prevent NaN display
+                portfolioValueEl.textContent = formatCurrencyLocale(100000);
+                totalPnlEl.textContent = formatCurrencyLocale(0);
+                totalReturnEl.textContent = formatPercentage(0);
+                realizedPnlEl.textContent = formatCurrencyLocale(0);
+                unrealizedPnlEl.textContent = formatCurrencyLocale(0);
+                availableCashEl.textContent = formatCurrencyLocale(100000);
             });
     }
 

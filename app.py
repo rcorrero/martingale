@@ -50,17 +50,6 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# File paths from configuration
-USERS_FILE = app.config['USERS_FILE']
-PORTFOLIOS_FILE = app.config['PORTFOLIOS_FILE']
-GLOBAL_TRANSACTIONS_FILE = app.config['GLOBAL_TRANSACTIONS_FILE']
-
-class User(UserMixin):
-    def __init__(self, username, password_hash):
-        self.id = username
-        self.username = username
-        self.password_hash = password_hash
-
 class LoginForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired(), Length(min=3, max=20)])
     password = PasswordField('Password', validators=[DataRequired()])
@@ -73,76 +62,68 @@ class RegisterForm(FlaskForm):
     submit = SubmitField('Register')
 
 @login_manager.user_loader
-def load_user(username):
-    users = load_users()
-    if username in users:
-        return User(username, users[username]['password_hash'])
-    return None
+def load_user(user_id):
+    try:
+        # Try to convert to int first (normal case)
+        return User.query.get(int(user_id))
+    except ValueError:
+        # If it's not a number, try to find by username
+        return User.query.filter_by(username=user_id).first()
 
-def load_users():
-    if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, 'r') as f:
-            return json.load(f)
-    return {}
-
-def save_users(users):
-    with open(USERS_FILE, 'w') as f:
-        json.dump(users, f)
-
-def load_portfolios():
-    if os.path.exists(PORTFOLIOS_FILE):
-        with open(PORTFOLIOS_FILE, 'r') as f:
-            return json.load(f)
-    return {}
-
-def save_portfolios(portfolios):
-    with open(PORTFOLIOS_FILE, 'w') as f:
-        json.dump(portfolios, f)
-
-def load_global_transactions():
-    """Load the global transactions list."""
-    if os.path.exists(GLOBAL_TRANSACTIONS_FILE):
-        with open(GLOBAL_TRANSACTIONS_FILE, 'r') as f:
-            return json.load(f)
-    return []
-
-def save_global_transactions(transactions):
-    """Save the global transactions list."""
-    with open(GLOBAL_TRANSACTIONS_FILE, 'w') as f:
-        json.dump(transactions, f)
-
-def add_global_transaction(transaction):
-    """Add a transaction to the global transactions list."""
-    transactions = load_global_transactions()
-    transactions.append(transaction)
-    
-    # Keep only the most recent 1000 transactions to prevent file from growing too large
-    if len(transactions) > 1000:
-        transactions = transactions[-1000:]
-    
-    save_global_transactions(transactions)
-
-def get_user_portfolio(username):
+def get_user_portfolio(user):
     """Get or create user portfolio with default values."""
-    portfolios = load_portfolios()
-    if username not in portfolios:
-        # Initialize portfolio with assets from configuration
+    if not user.portfolio:
+        # Create new portfolio with assets from configuration
+        portfolio = Portfolio(user_id=user.id, cash=app.config['INITIAL_CASH'])
         holdings = {symbol: 0 for symbol in app.config['ASSETS'].keys()}
         position_info = {symbol: {'total_cost': 0, 'total_quantity': 0} for symbol in app.config['ASSETS'].keys()}
         
-        portfolios[username] = {
-            'cash': app.config['INITIAL_CASH'],
-            'holdings': holdings,
-            'transactions': [],
-            'position_info': position_info
-        }
-        save_portfolios(portfolios)
-    return portfolios[username]
+        portfolio.set_holdings(holdings)
+        portfolio.set_position_info(position_info)
+        
+        db.session.add(portfolio)
+        db.session.commit()
+    
+    return user.portfolio
 
-def update_user_portfolio(username, portfolio):
-    portfolios = load_portfolios()
-    portfolios[username] = portfolio
-    save_portfolios(portfolios)
+def update_user_portfolio(user, portfolio_data):
+    """Update user portfolio in database."""
+    portfolio = user.portfolio
+    if portfolio:
+        portfolio.cash = portfolio_data.get('cash', portfolio.cash)
+        if 'holdings' in portfolio_data:
+            portfolio.set_holdings(portfolio_data['holdings'])
+        if 'position_info' in portfolio_data:
+            portfolio.set_position_info(portfolio_data['position_info'])
+        db.session.commit()
+
+def add_global_transaction(transaction_data):
+    """Add a transaction to the database."""
+    user = User.query.filter_by(username=transaction_data['username']).first()
+    if user:
+        transaction = Transaction(
+            user_id=user.id,
+            symbol=transaction_data['symbol'],
+            transaction_type=transaction_data['type'],
+            quantity=transaction_data['quantity'],
+            price=transaction_data['price'],
+            total_cost=transaction_data['total_cost']
+        )
+        db.session.add(transaction)
+        db.session.commit()
+
+def get_global_transactions(limit=50):
+    """Get recent global transactions from database."""
+    transactions = Transaction.query.order_by(Transaction.timestamp.desc()).limit(limit).all()
+    return [{
+        'timestamp': int(t.timestamp),  # t.timestamp is already a float in milliseconds
+        'username': t.user.username,
+        'symbol': t.symbol,
+        'type': t.type,  # Use 'type' not 'transaction_type'
+        'quantity': t.quantity,
+        'price': t.price,
+        'total_cost': t.total_cost
+    } for t in transactions]
 
 # Initialize price service (hybrid mode - uses API if available, fallback otherwise)
 price_service = HybridPriceService(
@@ -191,11 +172,9 @@ def login():
     
     form = LoginForm()
     if form.validate_on_submit():
-        users = load_users()
-        username = form.username.data
+        user = User.query.filter_by(username=form.username.data).first()
         
-        if username in users and check_password_hash(users[username]['password_hash'], form.password.data):
-            user = User(username, users[username]['password_hash'])
+        if user and user.check_password(form.password.data):
             login_user(user)
             return redirect(url_for('index'))
         else:
@@ -210,19 +189,21 @@ def register():
     
     form = RegisterForm()
     if form.validate_on_submit():
-        users = load_users()
         username = form.username.data
         
-        if username in users:
+        # Check if user already exists
+        if User.query.filter_by(username=username).first():
             flash('Username already exists')
-        else:
-            password_hash = generate_password_hash(form.password.data)
-            users[username] = {'password_hash': password_hash}
-            save_users(users)
-            
-            user = User(username, password_hash)
-            login_user(user)
-            return redirect(url_for('index'))
+            return render_template('register.html', form=form)
+        
+        # Create new user
+        user = User(username=username)
+        user.set_password(form.password.data)
+        db.session.add(user)
+        db.session.commit()
+        
+        login_user(user)
+        return redirect(url_for('index'))
     
     return render_template('register.html', form=form)
 
@@ -239,85 +220,142 @@ def about():
 @app.route('/api/portfolio', methods=['GET'])
 @login_required
 def get_portfolio():
-    portfolio = get_user_portfolio(current_user.username)
-    return jsonify(portfolio)
+    portfolio = get_user_portfolio(current_user)
+    
+    return jsonify({
+        'cash': portfolio.cash,
+        'holdings': portfolio.get_holdings(),
+        'position_info': portfolio.get_position_info(),
+        'transactions': [{
+            'timestamp': int(t.timestamp),  # t.timestamp is already a float in milliseconds
+            'symbol': t.symbol,
+            'type': t.type,  # Use 'type' not 'transaction_type'
+            'quantity': t.quantity,
+            'price': t.price,
+            'total_cost': t.total_cost
+        } for t in portfolio.user.transactions]
+    })
 
 @app.route('/api/performance', methods=['GET'])
 @login_required
 def get_performance():
-    portfolio = get_user_portfolio(current_user.username)
+    portfolio = get_user_portfolio(current_user)
     
     # Calculate portfolio value and performance
-    total_portfolio_value = portfolio['cash']
-    total_unrealized_pnl = 0
+    # Ensure cash is a valid number
+    portfolio_cash = portfolio.cash if portfolio.cash is not None else 0.0
+    total_portfolio_value = float(portfolio_cash)
+    total_unrealized_pnl = 0.0
+    
+    logger.info(f"Starting portfolio calculation - cash: {portfolio_cash}")
     
     # Get current prices from price service
-    current_prices = price_service.get_current_prices()
+    try:
+        current_prices = price_service.get_current_prices()
+        logger.info(f"Current prices for performance calculation: {current_prices}")
+    except Exception as e:
+        logger.error(f"Error getting current prices: {e}")
+        current_prices = {}
+    
+    holdings = portfolio.get_holdings()
+    position_info = portfolio.get_position_info()
+    logger.info(f"Holdings: {holdings}, Position info: {position_info}")
+    
+    # Validate that total_portfolio_value is not NaN before proceeding
+    if total_portfolio_value != total_portfolio_value:  # Check for NaN
+        logger.error(f"Portfolio cash is NaN: {portfolio_cash}")
+        total_portfolio_value = 100000.0  # Default to initial cash
     
     # Calculate current market value of holdings and unrealized P&L
-    for symbol, quantity in portfolio['holdings'].items():
-        if quantity > 0 and symbol in current_prices:
-            current_price = current_prices[symbol]['price']
-            market_value = quantity * current_price
-            total_portfolio_value += market_value
-            
-            # Calculate unrealized P&L using position_info
-            position_info = portfolio.get('position_info', {}).get(symbol, {})
-            cost_basis = position_info.get('total_cost', 0)
-            if cost_basis > 0:
-                unrealized_pnl = market_value - cost_basis
-                total_unrealized_pnl += unrealized_pnl
+    for symbol, quantity in holdings.items():
+        try:
+            if quantity > 0 and symbol in current_prices:
+                current_price = float(current_prices[symbol]['price']) if current_prices[symbol]['price'] is not None else 0.0
+                quantity = float(quantity) if quantity is not None else 0.0
+                market_value = quantity * current_price
+                
+                if not (market_value != market_value):  # Check for NaN
+                    total_portfolio_value += market_value
+                
+                # Calculate unrealized P&L using position_info
+                symbol_position = position_info.get(symbol, {})
+                cost_basis = float(symbol_position.get('total_cost', 0)) if symbol_position.get('total_cost') is not None else 0.0
+                if cost_basis > 0 and not (market_value != market_value):
+                    unrealized_pnl = market_value - cost_basis
+                    if not (unrealized_pnl != unrealized_pnl):  # Check for NaN
+                        total_unrealized_pnl += unrealized_pnl
+        except (ValueError, TypeError, KeyError) as e:
+            logger.warning(f"Error calculating market value for {symbol}: {e}")
+            continue
     
     # Calculate realized P&L by analyzing all transactions
-    initial_value = app.config['INITIAL_CASH']  # Starting cash from configuration
-    total_buys = 0
-    total_sells = 0
+    initial_value = float(app.config.get('INITIAL_CASH', 100000.0))  # Starting cash from configuration
+    total_buys = 0.0
+    total_sells = 0.0
     
     # Sum all buy and sell transactions
-    for transaction in portfolio.get('transactions', []):
-        if transaction['type'] == 'buy':
-            total_buys += transaction['total_cost']
-        else:  # sell
-            total_sells += transaction['total_cost']
+    for transaction in current_user.transactions:
+        cost = float(transaction.total_cost) if transaction.total_cost is not None else 0.0
+        if transaction.type == 'buy':
+            total_buys += cost
+        elif transaction.type == 'sell':
+            total_sells += cost
     
-    # Current value of holdings at cost
-    current_holdings_cost = 0
-    for symbol in portfolio['holdings']:
-        if portfolio['holdings'][symbol] > 0:
-            position_info = portfolio.get('position_info', {}).get(symbol, {})
-            current_holdings_cost += position_info.get('total_cost', 0)
+    # Realized P&L = what we got from selling - what we paid for buying
+    realized_pnl = total_sells - total_buys
     
-    # Realized P&L = sell proceeds - buy costs for completed positions
-    # For positions still held, their cost is excluded from realized P&L
-    total_realized_pnl = total_sells - (total_buys - current_holdings_cost)
+    # Total P&L = realized + unrealized
+    total_pnl = realized_pnl + total_unrealized_pnl
     
-    # Calculate total P&L and performance metrics
-    total_pnl = total_realized_pnl + total_unrealized_pnl
-    total_return_pct = ((total_portfolio_value - initial_value) / initial_value) * 100 if initial_value > 0 else 0
+    # Calculate total return percentage
+    if initial_value > 0:
+        total_return_percent = ((total_portfolio_value - initial_value) / initial_value) * 100
+    else:
+        total_return_percent = 0.0
+    # Final validation - ensure no NaN values are returned
+    if total_portfolio_value != total_portfolio_value:
+        total_portfolio_value = float(app.config.get('INITIAL_CASH', 100000.0))
+    if total_pnl != total_pnl:
+        total_pnl = 0.0
+    if total_return_percent != total_return_percent:
+        total_return_percent = 0.0
+    if realized_pnl != realized_pnl:
+        realized_pnl = 0.0
+    if total_unrealized_pnl != total_unrealized_pnl:
+        total_unrealized_pnl = 0.0
     
-    performance = {
-        'total_portfolio_value': round(total_portfolio_value, 2),
-        'cash': round(portfolio['cash'], 2),
-        'total_pnl': round(total_pnl, 2),
-        'realized_pnl': round(total_realized_pnl, 2),
+    logger.info(f"Final portfolio values - Value: {total_portfolio_value}, P&L: {total_pnl}, Return: {total_return_percent}%")
+    
+    return jsonify({
+        'portfolio_value': round(total_portfolio_value, 2),
+        'realized_pnl': round(realized_pnl, 2),
         'unrealized_pnl': round(total_unrealized_pnl, 2),
-        'total_return_percent': round(total_return_pct, 2),
-        'initial_value': initial_value
-    }
-    
-    return jsonify(performance)
+        'total_pnl': round(total_pnl, 2),
+        'total_return': round(total_return_percent, 2)
+    })
 
 @app.route('/api/debug/portfolio', methods=['GET'])
 @login_required
 def debug_portfolio():
-    portfolio = get_user_portfolio(current_user.username)
-    return jsonify(portfolio)
+    portfolio = get_user_portfolio(current_user)
+    return jsonify({
+        'cash': portfolio.cash,
+        'holdings': portfolio.get_holdings(),
+        'position_info': portfolio.get_position_info()
+    })
 
 @app.route('/api/transactions', methods=['GET'])
 @login_required
 def get_transactions():
-    portfolio = get_user_portfolio(current_user.username)
-    return jsonify(portfolio.get('transactions', []))
+    transactions = [{
+        'timestamp': int(t.timestamp),  # t.timestamp is already a float in milliseconds
+        'symbol': t.symbol,
+        'type': t.type,  # Use 'type' not 'transaction_type'
+        'quantity': t.quantity,
+        'price': t.price,
+        'total_cost': t.total_cost
+    } for t in current_user.transactions]
+    return jsonify(transactions)
 
 @app.route('/api/assets', methods=['GET'])
 def get_assets():
@@ -334,7 +372,6 @@ def get_assets_history():
 @app.route('/api/open-interest', methods=['GET'])
 def get_open_interest():
     """Calculate total open interest for each asset by summing all users' holdings."""
-    portfolios = load_portfolios()
     open_interest = {}
     
     # Initialize open interest for all assets
@@ -342,8 +379,9 @@ def get_open_interest():
         open_interest[symbol] = 0
     
     # Sum holdings across all users
-    for username, portfolio in portfolios.items():
-        holdings = portfolio.get('holdings', {})
+    portfolios = Portfolio.query.all()
+    for portfolio in portfolios:
+        holdings = portfolio.get_holdings()
         for symbol, quantity in holdings.items():
             if symbol in open_interest:
                 open_interest[symbol] += quantity
@@ -351,12 +389,10 @@ def get_open_interest():
     return jsonify(open_interest)
 
 @app.route('/api/global-transactions', methods=['GET'])
-def get_global_transactions():
+def get_global_transactions_api():
     """Get the last 50 global transactions for Time & Sales display."""
-    transactions = load_global_transactions()
-    # Return the last 50 transactions, most recent first
-    last_50 = transactions[-50:] if len(transactions) >= 50 else transactions
-    return jsonify(last_50[::-1])  # Reverse to show most recent first
+    transactions = get_global_transactions(50)
+    return jsonify(transactions[::-1])  # Most recent first
 
 @socketio.on('trade')
 def handle_trade(data):
@@ -366,7 +402,7 @@ def handle_trade(data):
         return
         
     try:
-        portfolio = get_user_portfolio(current_user.username)
+        portfolio = get_user_portfolio(current_user)
         symbol = data['symbol'].upper()
         trade_type = data['type']
         quantity = float(data['quantity'])
@@ -381,115 +417,171 @@ def handle_trade(data):
         cost = quantity * price
         timestamp = time.time() * 1000  # JavaScript-compatible timestamp
 
-        # Ensure position_info exists for this symbol
-        if 'position_info' not in portfolio:
-            portfolio['position_info'] = {}
-        if symbol not in portfolio['position_info']:
-            portfolio['position_info'][symbol] = {'total_cost': 0, 'total_quantity': 0}
-
-        # Ensure holdings exists for this symbol
-        if symbol not in portfolio['holdings']:
-            portfolio['holdings'][symbol] = 0
-
-        # Ensure transactions list exists
-        if 'transactions' not in portfolio:
-            portfolio['transactions'] = []
+        # Get current holdings and position info
+        holdings = portfolio.get_holdings()
+        position_info = portfolio.get_position_info()
+        
+        # Ensure data exists for this symbol
+        if symbol not in holdings:
+            holdings[symbol] = 0
+        if symbol not in position_info:
+            position_info[symbol] = {'total_cost': 0, 'total_quantity': 0}
 
         if trade_type == 'buy':
-            if portfolio['cash'] >= cost:
-                portfolio['cash'] -= cost
-                portfolio['holdings'][symbol] += quantity
+            if portfolio.cash >= cost:
+                portfolio.cash -= cost
+                holdings[symbol] += quantity
                 
                 # Update position info for VWAP calculation
-                portfolio['position_info'][symbol]['total_cost'] += cost
-                portfolio['position_info'][symbol]['total_quantity'] += quantity
+                position_info[symbol]['total_cost'] += cost
+                position_info[symbol]['total_quantity'] += quantity
                 
-                # Record transaction
-                transaction = {
+                # Update portfolio in database
+                portfolio.set_holdings(holdings)
+                portfolio.set_position_info(position_info)
+                
+                # Record transaction in database
+                transaction = Transaction(
+                    user_id=current_user.id,
+                    timestamp=timestamp,
+                    symbol=symbol,
+                    type='buy',
+                    quantity=quantity,
+                    price=price,
+                    total_cost=cost
+                )
+                db.session.add(transaction)
+                db.session.commit()
+                
+                # Create transaction data for global feed
+                transaction_data = {
                     'timestamp': timestamp,
+                    'username': current_user.username,
                     'symbol': symbol,
                     'type': 'buy',
                     'quantity': quantity,
                     'price': price,
                     'total_cost': cost
                 }
-                portfolio['transactions'].append(transaction)
                 
-                # Add transaction to global transactions (anonymous)
-                global_transaction = {
-                    'timestamp': timestamp,
-                    'symbol': symbol,
-                    'type': 'buy',
-                    'quantity': quantity,
-                    'price': price,
-                    'total_cost': cost
-                }
-                add_global_transaction(global_transaction)
-                
-                update_user_portfolio(current_user.username, portfolio)
                 emit('trade_confirmation', {'success': True, 'message': f'Bought {quantity} {symbol}', 'symbol': symbol, 'type': 'buy', 'quantity': quantity})
-                emit('transaction_added', transaction)
+                emit('transaction_added', {
+                    'timestamp': timestamp,
+                    'symbol': symbol,
+                    'type': 'buy',
+                    'quantity': quantity,
+                    'price': price,
+                    'total_cost': cost
+                })
                 
                 # Broadcast global transaction update to all clients for Time & Sales
-                socketio.emit('global_transaction_update', global_transaction)
+                socketio.emit('global_transaction_update', transaction_data)
             else:
                 emit('trade_confirmation', {'success': False, 'message': 'Insufficient funds', 'symbol': symbol, 'type': 'buy', 'quantity': quantity})
                 
         elif trade_type == 'sell':
-            if portfolio['holdings'][symbol] >= quantity:
-                portfolio['cash'] += cost
-                portfolio['holdings'][symbol] -= quantity
+            if holdings[symbol] >= quantity:
+                portfolio.cash += cost
+                holdings[symbol] -= quantity
                 
                 # Update position info for VWAP calculation
-                if portfolio['position_info'][symbol]['total_quantity'] > 0:
-                    # Calculate proportion being sold
-                    sell_proportion = quantity / portfolio['position_info'][symbol]['total_quantity']
-                    cost_to_remove = portfolio['position_info'][symbol]['total_cost'] * sell_proportion
-                    portfolio['position_info'][symbol]['total_cost'] -= cost_to_remove
-                    portfolio['position_info'][symbol]['total_quantity'] -= quantity
+                if position_info[symbol]['total_quantity'] > 0:
+                    # Calculate proportion of position being sold
+                    proportion_sold = quantity / position_info[symbol]['total_quantity']
+                    cost_basis_sold = position_info[symbol]['total_cost'] * proportion_sold
                     
-                    # If position is completely closed, reset position info
-                    if portfolio['holdings'][symbol] <= 0:
-                        portfolio['position_info'][symbol] = {'total_cost': 0, 'total_quantity': 0}
+                    position_info[symbol]['total_cost'] -= cost_basis_sold
+                    position_info[symbol]['total_quantity'] -= quantity
                 
-                # Record transaction
-                transaction = {
+                # Update portfolio in database
+                portfolio.set_holdings(holdings)
+                portfolio.set_position_info(position_info)
+                
+                # Record transaction in database
+                transaction = Transaction(
+                    user_id=current_user.id,
+                    timestamp=timestamp,
+                    symbol=symbol,
+                    type='sell',
+                    quantity=quantity,
+                    price=price,
+                    total_cost=cost
+                )
+                db.session.add(transaction)
+                db.session.commit()
+                
+                # Create transaction data for global feed
+                transaction_data = {
                     'timestamp': timestamp,
+                    'username': current_user.username,
                     'symbol': symbol,
                     'type': 'sell',
                     'quantity': quantity,
                     'price': price,
                     'total_cost': cost
                 }
-                portfolio['transactions'].append(transaction)
                 
-                # Add transaction to global transactions (anonymous)
-                global_transaction = {
-                    'timestamp': timestamp,
-                    'symbol': symbol,
-                    'type': 'sell',
-                    'quantity': quantity,
-                    'price': price,
-                    'total_cost': cost
-                }
-                add_global_transaction(global_transaction)
-                
-                update_user_portfolio(current_user.username, portfolio)
                 emit('trade_confirmation', {'success': True, 'message': f'Sold {quantity} {symbol}', 'symbol': symbol, 'type': 'sell', 'quantity': quantity})
-                emit('transaction_added', transaction)
+                emit('transaction_added', {
+                    'timestamp': timestamp,
+                    'symbol': symbol,
+                    'type': 'sell',
+                    'quantity': quantity,
+                    'price': price,
+                    'total_cost': cost
+                })
                 
                 # Broadcast global transaction update to all clients for Time & Sales
-                socketio.emit('global_transaction_update', global_transaction)
+                socketio.emit('global_transaction_update', transaction_data)
             else:
                 emit('trade_confirmation', {'success': False, 'message': 'Insufficient holdings', 'symbol': symbol, 'type': 'sell', 'quantity': quantity})
         
-        emit('portfolio_update', portfolio)
+        # Emit portfolio update to the user
+        socketio.emit('portfolio_update', {
+            'cash': portfolio.cash,
+            'holdings': portfolio.get_holdings(),
+            'position_info': portfolio.get_position_info()
+        }, room=request.sid)
         
-    except (ValueError, KeyError) as e:
-        symbol = data.get('symbol', 'unknown') if isinstance(data, dict) else 'unknown'
-        emit('trade_confirmation', {'success': False, 'message': f'Invalid trade data: {str(e)}', 'symbol': symbol})
+    except Exception as e:
+        import traceback
+        logger.error(f"Trade error: {e}")
+        logger.error(f"Trade error traceback: {traceback.format_exc()}")
+        emit('trade_confirmation', {'success': False, 'message': f'Trade processing error: {str(e)}'})
 
+def update_prices():
+    """Get updated prices from price service and emit to clients."""
+    try:
+        current_prices = price_service.get_current_prices()
+        socketio.emit('price_update', current_prices)
+        
+        # Emit individual price updates for charts
+        for symbol, data in current_prices.items():
+            socketio.emit('price_chart_update', {
+                'symbol': symbol,
+                'time': data.get('last_update', time.time() * 1000),
+                'price': data['price']
+            })
+    except Exception as e:
+        logger.error(f"Price update error: {e}")
 
+# Background thread for price updates
+def price_update_thread():
+    """Background thread to update prices periodically."""
+    while True:
+        time.sleep(app.config.get('PRICE_UPDATE_INTERVAL', 1))  # Update every second
+        update_prices()
+
+# Start the price update thread
+price_thread = threading.Thread(target=price_update_thread, daemon=True)
+price_thread.start()
+
+if __name__ == '__main__':
+    # Initialize database tables
+    with app.app_context():
+        db.create_all()
+        logger.info("Database tables created")
+    
 if __name__ == '__main__':
     # Start price update thread
     price_thread = threading.Thread(target=update_prices)

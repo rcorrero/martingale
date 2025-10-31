@@ -23,11 +23,6 @@ class Config:
     # Application settings
     INITIAL_CASH = float(os.environ.get('INITIAL_CASH', 100000))
     
-    # File paths
-    USERS_FILE = 'users.json'
-    PORTFOLIOS_FILE = 'portfolios.json'
-    GLOBAL_TRANSACTIONS_FILE = 'global_transactions.json'
-    
     # Price service configuration
     PRICE_SERVICE_URL = os.environ.get('PRICE_SERVICE_URL', 'http://localhost:5001')
     
