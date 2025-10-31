@@ -37,7 +37,8 @@ def create_app(config_name='default'):
     return app
 
 # Create Flask app
-app = create_app(os.environ.get('FLASK_ENV', 'development'))
+config_name = os.environ.get('FLASK_ENV', 'development')
+app = create_app(config_name)
 socketio = SocketIO(app)
 
 # Initialize Flask-Login
