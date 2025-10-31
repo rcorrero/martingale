@@ -10,3 +10,8 @@ requests==2.31.0
 # Production WSGI server (required for Heroku)
 gunicorn==21.2.0
 eventlet==0.33.3
+
+# Database
+psycopg2-binary==2.9.7
+SQLAlchemy==2.0.21
+Flask-SQLAlchemy==3.0.5

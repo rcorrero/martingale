@@ -1,8 +1,8 @@
 {
   "name": "Martingale Paper Trading Platform",
   "description": "A paper trading platform for educational purposes with real-time price simulation",
-  "repository": "https://github.com/YOUR_USERNAME/martingale",
-  "logo": "https://raw.githubusercontent.com/YOUR_USERNAME/martingale/main/static/favicon-32x32.png",
+  "repository": "https://github.com/your-username/martingale",
+  "logo": "https://raw.githubusercontent.com/your-username/martingale/main/static/favicon-32x32.png",
   "keywords": ["python", "flask", "trading", "education", "socketio", "realtime"],
   "env": {
     "SECRET_KEY": {

@@ -13,6 +13,13 @@ class Config:
     # Flask configuration
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     
+    # Database configuration
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///martingale.db'
+    # Fix for Heroku postgres URL
+    if SQLALCHEMY_DATABASE_URI and SQLALCHEMY_DATABASE_URI.startswith('postgres://'):
+        SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace('postgres://', 'postgresql://')
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
     # Application settings
     INITIAL_CASH = float(os.environ.get('INITIAL_CASH', 100000))
     

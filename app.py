@@ -15,6 +15,7 @@ import os
 import logging
 from config import config
 from price_client import HybridPriceService
+from models import db, User, Portfolio, Transaction, PriceData
 
 # Configure logging
 logging.basicConfig(
@@ -33,6 +34,9 @@ def create_app(config_name='default'):
     
     # Load configuration
     app.config.from_object(config[config_name])
+    
+    # Initialize database
+    db.init_app(app)
     
     return app
 
