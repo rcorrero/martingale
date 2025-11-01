@@ -37,8 +37,9 @@ A professional paper trading web application for simulated asset trading with re
 3. **Initialize Database Schema**
    ```bash
    source .venv/bin/activate
-   python init_database.py --env production
+   python init_database.py --env production --no-reset --skip-price-seed --skip-asset-seed
    ```
+   > Use this safe mode to create any missing tables without touching existing data. Run without the flags only when you explicitly intend to wipe and reseed production.
 
 4. **Start Services**
    ```bash

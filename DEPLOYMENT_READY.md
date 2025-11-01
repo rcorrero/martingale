@@ -22,7 +22,7 @@
 
 ### Migration/Setup Files - UPDATED ✅
 - **init_database.py**: Unified CLI to reset and seed databases across environments
-- **init_db.py / init_heroku_db.py**: Legacy entrypoints delegating to the new initializer
+- **init_db.py / init_heroku_db.py**: Legacy entrypoints delegating to the new initializer (Heroku version uses non-destructive flags during release)
 - **price_client.py**: Database-aware price service with API fallback
 - **backup_strategy.py**: Updated for database backups (was JSON file backups)
 - **init_local_data.py**: Marked as DEPRECATED, warns users to use database

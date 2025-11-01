@@ -4,4 +4,9 @@ from init_database import main
 
 
 if __name__ == '__main__':
-    raise SystemExit(main(['--env', 'production']))
+    raise SystemExit(main([
+        '--env', 'production',
+        '--no-reset',
+        '--skip-price-seed',
+        '--skip-asset-seed',
+    ]))
