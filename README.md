@@ -44,12 +44,17 @@ See [EXPIRING_ASSETS_SUMMARY.md](EXPIRING_ASSETS_SUMMARY.md) for detailed docume
 
 2. **Create a virtual environment:**
    ```bash
-   python3 -m venv venv
+   5. **Initialize the database schema:**
+       ```bash
+       python init_database.py --env development
+       ```
+
+   6. **Run the application:**
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 3. **Install dependencies:**
-   ```bash
+   7. **Open your browser and navigate to:**
    pip install -r requirements.txt
    ```
 
@@ -190,6 +195,16 @@ flask shell
 >>> Asset.query.filter_by(is_active=False).count()
 0
 ```
+
+### Resetting the Database
+
+Use the unified initialization script to drop and recreate tables, reseed price metadata, and rebuild the active asset pool:
+
+```bash
+python init_database.py --env development
+```
+
+Flags such as `--no-reset`, `--skip-price-seed`, or `--skip-asset-seed` let you customize what gets reinitialized. For production deployments (including Heroku) run the same script with `--env production` in the target environment.
 
 ## Contributing
 

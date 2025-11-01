@@ -34,7 +34,13 @@ A professional paper trading web application for simulated asset trading with re
    - Set a secure `SECRET_KEY`
    - Adjust other settings as needed
 
-3. **Start Services**
+3. **Initialize Database Schema**
+   ```bash
+   source .venv/bin/activate
+   python init_database.py --env production
+   ```
+
+4. **Start Services**
    ```bash
    source .venv/bin/activate
    python start_services.py
@@ -61,7 +67,7 @@ A professional paper trading web application for simulated asset trading with re
 
 - **Web Application** (port 5000): Main Flask app with user interface
 - **Price Service** (port 5001): Independent price generation service
-- **Data Storage**: JSON files for users, portfolios, and transactions
+- **Data Storage**: PostgreSQL backend for users, portfolios, assets, transactions, and settlements
 
 ### Monitoring and Logs
 
@@ -78,6 +84,7 @@ A professional paper trading web application for simulated asset trading with re
 - [ ] Log rotation configured
 - [ ] Backup strategy for data files
 - [ ] Monitoring and alerting set up
+- [ ] Document database reset procedure using `python init_database.py --env production`
 
 ## Development
 
