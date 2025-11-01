@@ -8,14 +8,11 @@ Enhanced the Martingale paper trading platform with comprehensive security measu
 ### 1. Password Security Enhancements
 **File**: `app.py`
 
-- Added custom `validate_password_strength()` validator requiring:
+- Added custom `validate_password_strength()` validator enforcing:
   - Minimum 8 characters
-  - At least 1 uppercase letter (A-Z)
-  - At least 1 lowercase letter (a-z)
-  - At least 1 digit (0-9)
-  - At least 1 special character (!@#$%^&*(),.?":{}|<>)
+  - Non-whitespace characters (rejects passwords that are only spaces)
 
-- Updated `RegisterForm` to use new password validator
+- Updated `RegisterForm` to use the validator
 - Passwords continue to be hashed with Werkzeug's `generate_password_hash` (scrypt algorithm)
 
 ### 2. Username Validation
@@ -87,7 +84,7 @@ Enhanced the Martingale paper trading platform with comprehensive security measu
 ## Security Features Summary
 
 ### ✅ Implemented
-- Strong password complexity requirements
+- Minimum-length password policy (8+ characters, whitespace-only values rejected)
 - Username validation and sanitization
 - Login rate limiting (5 attempts / 5 minutes)
 - Password hashing with scrypt algorithm
@@ -121,11 +118,9 @@ Enhanced the Martingale paper trading platform with comprehensive security measu
 ### Test Password Validation
 1. Navigate to `/register`
 2. Try these passwords (should fail):
-   - "password" - no uppercase, no number, no special char
-   - "Password" - no number, no special char
-   - "Password1" - no special char
-   - "pass1!" - too short (< 8 chars)
-3. Try valid password: "Password123!"
+  - "short" - fewer than 8 characters
+  - "        " - whitespace only
+3. Try valid password: "CorrectHorseBatteryStaple"
 
 ### Test Username Validation
 1. Navigate to `/register`

@@ -69,27 +69,13 @@ RATE_LIMIT_WINDOW = 300  # 5 minutes in seconds
 
 def validate_password_strength(form, field):
     """Custom validator for password strength."""
-    password = field.data
-    
-    # Check minimum length
+    password = field.data or ''
+
     if len(password) < 8:
         raise ValidationError('Password must be at least 8 characters long.')
-    
-    # Check for uppercase
-    if not re.search(r'[A-Z]', password):
-        raise ValidationError('Password must contain at least one uppercase letter.')
-    
-    # Check for lowercase
-    if not re.search(r'[a-z]', password):
-        raise ValidationError('Password must contain at least one lowercase letter.')
-    
-    # Check for digit
-    if not re.search(r'\d', password):
-        raise ValidationError('Password must contain at least one number.')
-    
-    # Check for special character
-    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
-        raise ValidationError('Password must contain at least one special character (!@#$%^&*(),.?":{}|<>).')
+
+    if not password.strip():
+        raise ValidationError('Password cannot be only whitespace characters.')
 
 def validate_username(form, field):
     """Custom validator for username."""

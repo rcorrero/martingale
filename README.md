@@ -204,7 +204,7 @@ flask shell
 ⚠️ **Important**: This application implements multiple security features for production use.
 
 ### Implemented Security Features
-- ✅ Strong password requirements (8+ chars, uppercase, lowercase, numbers, special chars)
+- ✅ Password length policy (8+ chars, whitespace-only passwords rejected)
 - ✅ Username validation and sanitization
 - ✅ Rate limiting on login attempts (5 attempts per 5 minutes)
 - ✅ Password hashing with scrypt algorithm

@@ -5,12 +5,8 @@ This document outlines the security measures implemented in the Martingale paper
 ## Authentication & Authorization
 
 ### Password Security
-- **Minimum Length**: 8 characters required
-- **Complexity Requirements**: 
-  - At least one uppercase letter (A-Z)
-  - At least one lowercase letter (a-z)
-  - At least one digit (0-9)
-  - At least one special character (!@#$%^&*(),.?":{}|<>)
+- **Minimum Length**: 8 characters required (longer passphrases recommended)
+- **Complexity Requirements**: No additional complexity rules enforced; whitespace-only passwords are rejected
 - **Hashing**: Passwords are hashed using Werkzeug's `generate_password_hash` (scrypt algorithm by default)
 - **Storage**: Password hashes stored with 255-character field to accommodate algorithm changes
 
@@ -25,13 +21,6 @@ This document outlines the security measures implemented in the Martingale paper
 - **Time Window**: 5-minute lockout period after exceeding attempts
 - **Reset**: Counter resets after successful login or window expiration
 - **Protection**: Prevents brute-force password attacks
-
-### CAPTCHA Protection
-- **Implementation**: Google reCAPTCHA v2 (checkbox)
-- **Registration**: Required when enabled via environment variable
-- **Theme**: Dark theme to match terminal UI
-- **Optional**: Can be disabled for development, enabled for production
-- **Bot Prevention**: Prevents automated account creation
 
 ## Session Security
 
@@ -73,7 +62,7 @@ This document outlines the security measures implemented in the Martingale paper
 ## Security Best Practices
 
 ### What's Implemented
-✅ Strong password requirements  
+✅ Minimum password length enforcement  
 ✅ Password hashing with modern algorithm  
 ✅ Rate limiting on login  
 ✅ Session timeout  
@@ -82,12 +71,11 @@ This document outlines the security measures implemented in the Martingale paper
 ✅ XSS protection (HttpOnly cookies)  
 ✅ Input validation and sanitization  
 ✅ Secure session configuration  
-✅ CAPTCHA for registration (optional)  
 
 ### Future Enhancements (Optional)
 - Email verification for new accounts
 - Two-factor authentication (2FA)
-- CAPTCHA for login (in addition to registration)
+- CAPTCHA for registration/login
 - Account lockout after repeated failures
 - Audit logging for security events
 - Password reset via email
@@ -103,20 +91,7 @@ Ensure the following are set in production:
 SECRET_KEY=<strong-random-secret-key>
 FLASK_ENV=production
 DATABASE_URL=<postgresql-connection-string>
-
-# Optional: Enable reCAPTCHA for bot protection
-RECAPTCHA_ENABLED=true
-RECAPTCHA_SITE_KEY=<your-recaptcha-site-key>
-RECAPTCHA_SECRET_KEY=<your-recaptcha-secret-key>
 ```
-
-### Getting reCAPTCHA Keys
-1. Visit https://www.google.com/recaptcha/admin
-2. Register a new site
-3. Choose reCAPTCHA v2 (Checkbox)
-4. Add your domain(s)
-5. Copy the Site Key and Secret Key
-6. Add to environment variables
 
 ### HTTPS Required
 - Production configuration enforces `SESSION_COOKIE_SECURE=True`
