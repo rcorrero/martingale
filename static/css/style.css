@@ -751,6 +751,84 @@ td {
     background: var(--terminal-panel-overlay);
 }
 
+.buying-power-card {
+    margin-top: 18px;
+    padding: 18px;
+    border-radius: 12px;
+    border: 1px solid var(--terminal-border);
+    background: var(--terminal-surface-light);
+    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.4);
+}
+
+.buying-power-header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+.buying-power-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--terminal-accent);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.buying-power-hint {
+    color: var(--terminal-text-secondary);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.buying-power-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+}
+
+.buying-power-metric {
+    background: var(--terminal-bg);
+    border: 1px solid var(--terminal-border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.metric-label {
+    color: var(--terminal-text-secondary);
+    font-size: 11px;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.metric-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--terminal-text);
+    transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+.metric-value-empty {
+    color: var(--terminal-text-secondary);
+    opacity: 0.7;
+}
+
+#buying-power-price.metric-value:not(.metric-value-empty) {
+    color: var(--terminal-accent-secondary);
+}
+
+#buying-power-shares.metric-value:not(.metric-value-empty) {
+    color: var(--terminal-success);
+}
+
 .charts-section {
     margin-top: 20px;
     grid-column: 1 / -1;
@@ -1194,6 +1272,14 @@ td {
     /* Assets table optimizations */
     #assets-table {
         font-size: 11px;
+    }
+
+    .buying-power-card {
+        padding: 16px;
+    }
+
+    .buying-power-grid {
+        grid-template-columns: 1fr;
     }
     
     #assets-table th,

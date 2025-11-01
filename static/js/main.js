@@ -11,6 +11,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const quantityInput = document.getElementById('quantity-input');
     const tradeMessage = document.getElementById('trade-message');
     const sellAllBtn = document.getElementById('sell-all-btn');
+    const buyingPowerCashEl = document.getElementById('buying-power-cash');
+    const buyingPowerPriceEl = document.getElementById('buying-power-price');
+    const buyingPowerSharesEl = document.getElementById('buying-power-shares');
     const chartsContainer = document.getElementById('charts-container');
     const transactionsTableBody = document.querySelector('#transactions-table tbody');
     
@@ -38,6 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let openInterestData = {}; // Store open interest data for all assets
     let currentlyHighlightedSymbol = null; // Track currently highlighted holding
     let activeHoldingSymbol = null; // Track the holding currently hovered by the user
+    let latestAssetPrices = {}; // Cache latest prices for buying power calculations
+    let availableCashAmount = 0; // Track current available cash
 
     // Function to apply asset search filter
     function applyAssetSearchFilter() {
@@ -452,6 +457,56 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function setAvailableCash(amount) {
+        const numericAmount = Number(amount);
+        availableCashAmount = Number.isFinite(numericAmount) ? numericAmount : 0;
+
+        if (availableCashEl) {
+            availableCashEl.textContent = formatCurrencyLocale(availableCashAmount);
+        }
+
+        updateBuyingPowerDisplay();
+    }
+
+    function updateBuyingPowerDisplay() {
+        if (buyingPowerCashEl) {
+            buyingPowerCashEl.textContent = formatCurrencyLocale(availableCashAmount);
+            buyingPowerCashEl.classList.toggle('metric-value-empty', availableCashAmount <= 0);
+        }
+
+        if (!buyingPowerPriceEl || !buyingPowerSharesEl) {
+            return;
+        }
+
+        const symbol = assetInput ? assetInput.value.trim().toUpperCase() : '';
+        const rawPrice = symbol ? latestAssetPrices[symbol] : undefined;
+
+        if (!symbol || rawPrice == null) {
+            buyingPowerPriceEl.textContent = '--';
+            buyingPowerSharesEl.textContent = '--';
+            buyingPowerPriceEl.classList.add('metric-value-empty');
+            buyingPowerSharesEl.classList.add('metric-value-empty');
+            return;
+        }
+
+        const numericPrice = Number(rawPrice);
+        if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
+            buyingPowerPriceEl.textContent = '--';
+            buyingPowerSharesEl.textContent = '--';
+            buyingPowerPriceEl.classList.add('metric-value-empty');
+            buyingPowerSharesEl.classList.add('metric-value-empty');
+            return;
+        }
+
+        buyingPowerPriceEl.textContent = formatCurrencyLocale(numericPrice);
+        buyingPowerPriceEl.classList.remove('metric-value-empty');
+
+        const maxShares = Math.floor(availableCashAmount / numericPrice);
+        const clampedShares = Math.max(maxShares, 0);
+        buyingPowerSharesEl.textContent = formatNumber(clampedShares, 0);
+        buyingPowerSharesEl.classList.toggle('metric-value-empty', clampedShares < 1);
+    }
+
     // Enhanced number formatting functions with locale support
     function formatNumber(number, decimals = 2) {
         return new Intl.NumberFormat(undefined, {
@@ -667,7 +722,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     })
                     .then(portfolio => {
                         if (!portfolio) return;
-                        availableCashEl.textContent = formatCurrencyLocale(portfolio.cash);
+                        setAvailableCash(portfolio.cash);
                     })
                     .catch(error => {
                         // Error fetching portfolio for cash
@@ -681,7 +736,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 totalReturnEl.textContent = formatPercentage(0);
                 realizedPnlEl.textContent = formatCurrencyLocale(0);
                 unrealizedPnlEl.textContent = formatCurrencyLocale(0);
-                availableCashEl.textContent = formatCurrencyLocale(100000);
+                setAvailableCash(100000);
             });
     }
 
@@ -1086,6 +1141,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const assetInput = document.getElementById('asset-input');
         if (assetInput) {
             assetInput.value = symbol.toUpperCase();
+            assetInput.dispatchEvent(new Event('input'));
         }
     }
 
@@ -1166,6 +1222,7 @@ document.addEventListener('DOMContentLoaded', () => {
         userTransactions = transactions;
         userPortfolio = portfolio;
         currentUserId = portfolio.user_id; // Store user ID
+        setAvailableCash(portfolio.cash);
         updateTransactionsTable();
         updatePortfolio();
         updatePerformance();
@@ -1199,6 +1256,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function updateAssetsTable(assets) {
+        latestAssetPrices = {};
         // Fetch current open interest data
         fetch('/api/open-interest')
             .then(response => response.json())
@@ -1211,6 +1269,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 for (const symbol of sortedSymbols) {
                     const assetData = assets[symbol];
                     const currentPrice = assetData.price;
+                    latestAssetPrices[symbol] = currentPrice;
                     const color = getInstrumentColor(symbol, assetData);
                     
                     // Determine price color based on change
@@ -1248,6 +1307,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Reapply search filter after table update
                 applyAssetSearchFilter();
+                updateBuyingPowerDisplay();
             })
             .catch(error => {
                 // Error fetching open interest
@@ -1259,6 +1319,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 for (const symbol of sortedSymbols) {
                     const assetData = assets[symbol];
                     const currentPrice = assetData.price;
+                    latestAssetPrices[symbol] = currentPrice;
                     const color = getInstrumentColor(symbol);
                     
                     let priceColor = '#e2e8f0';
@@ -1289,6 +1350,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Reapply search filter after table update
                 applyAssetSearchFilter();
+                updateBuyingPowerDisplay();
             });
     }
 
@@ -1309,7 +1371,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const option = document.createElement('option');
                 option.value = symbol;
                 assetSuggestions.appendChild(option);
+                latestAssetPrices[symbol] = assets[symbol]?.price;
             }
+            updateBuyingPowerDisplay();
         });
 
     // Update portfolio display
@@ -1331,6 +1395,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!portfolio) return; // Skip if redirected
                 
                 userPortfolio = portfolio;
+                setAvailableCash(portfolio.cash);
                 
                 // Update transactions if included in response
                 if (portfolio.transactions) {
@@ -1483,6 +1548,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             quantityInput.value = '1';
         }
+
+        updateBuyingPowerDisplay();
     });
 
     // Handle sell all positions button

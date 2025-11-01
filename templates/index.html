@@ -135,6 +135,26 @@
                     <button type="button" id="sell-all-btn">Sell All Positions</button>
                 </form>
                 <p id="trade-message"></p>
+                <div class="buying-power-card">
+                    <div class="buying-power-header">
+                        <h3>Buying Power Calculator</h3>
+                        <span class="buying-power-hint">Enter a symbol to estimate the maximum shares you can buy with your available cash.</span>
+                    </div>
+                    <div class="buying-power-grid">
+                        <div class="buying-power-metric">
+                            <span class="metric-label">Available Cash</span>
+                            <span class="metric-value metric-value-empty" id="buying-power-cash">$0.00</span>
+                        </div>
+                        <div class="buying-power-metric">
+                            <span class="metric-label">Current Price</span>
+                            <span class="metric-value metric-value-empty" id="buying-power-price">--</span>
+                        </div>
+                        <div class="buying-power-metric">
+                            <span class="metric-label">Max Shares</span>
+                            <span class="metric-value metric-value-empty" id="buying-power-shares">--</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="charts-section">
