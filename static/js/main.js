@@ -27,14 +27,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const availableCashEl = document.getElementById('available-cash');
     
     const charts = {};
+    const rootStyles = getComputedStyle(document.documentElement);
+    const themeAccentColor = rootStyles.getPropertyValue('--terminal-border-strong').trim() || '#3b82f6';
+    const themeGlowColor = rootStyles.getPropertyValue('--terminal-glow').trim() || 'rgba(59, 130, 246, 0.28)';
     let userTransactions = [];
     let userPortfolio = {};
     let currentUserId = null; // Store current user ID for filtering
     let portfolioPieChart = null;
     let previousPrices = {}; // Track previous prices for color comparison
-    let cachedSettlements = []; // Cache settlements to prevent flickering
     let openInterestData = {}; // Store open interest data for all assets
     let currentlyHighlightedSymbol = null; // Track currently highlighted holding
+    let activeHoldingSymbol = null; // Track the holding currently hovered by the user
 
     // Function to apply asset search filter
     function applyAssetSearchFilter() {
@@ -200,7 +203,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                     borderColor: '#2d3748',
                                     borderWidth: 2,
                                     hoverBorderWidth: 4,
-                                    hoverBorderColor: '#00ff88',
+                                    hoverBorderColor: themeAccentColor,
+                                    hoverBackgroundColor: themeAccentColor,
                                     hoverOffset: 0
                                 }]
                             },
@@ -220,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                         mode: 'nearest',
                                         intersect: true,
                                         backgroundColor: 'rgba(10, 14, 26, 0.95)',
-                                        titleColor: '#00ff88',
+                                        titleColor: themeAccentColor,
                                         bodyColor: '#e2e8f0',
                                         borderColor: '#2d3748',
                                         borderWidth: 1,
@@ -313,23 +317,53 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Cross-highlighting helper functions
+    const HOLDING_HIGHLIGHT_STYLE = {
+        background: 'rgba(59, 130, 246, 0.18)',
+        border: themeAccentColor,
+        boxShadow: `0 0 18px ${themeGlowColor}`,
+        transform: 'scale(1.015)'
+    };
+
+    function applyHoldingHighlight(item, animate = true) {
+        if (!item) return;
+
+        if (!animate) {
+            item.classList.add('no-transition');
+        }
+
+        item.style.backgroundColor = HOLDING_HIGHLIGHT_STYLE.background;
+        item.style.borderColor = HOLDING_HIGHLIGHT_STYLE.border;
+        item.style.boxShadow = HOLDING_HIGHLIGHT_STYLE.boxShadow;
+        item.style.transform = HOLDING_HIGHLIGHT_STYLE.transform;
+
+        if (!animate) {
+            requestAnimationFrame(() => item.classList.remove('no-transition'));
+        }
+    }
+
+    function resetHoldingHighlight(item) {
+        if (!item) return;
+        item.classList.remove('no-transition');
+        item.style.backgroundColor = '';
+        item.style.borderColor = '';
+        item.style.boxShadow = '';
+        item.style.transform = '';
+    }
+
     function highlightHoldingsItem(symbol) {
         clearHoldingsHighlight();
         const holdingsItems = document.querySelectorAll('#holdings-list li');
         holdingsItems.forEach(item => {
-            const symbolBadge = item.querySelector('.symbol-badge');
-            if (symbolBadge) {
-                const badgeText = symbolBadge.textContent;
-                // Check for exact match or Cash/CASH equivalence
-                if (badgeText === symbol || 
-                    (symbol === 'Cash' && badgeText === 'CASH') ||
-                    (symbol === 'CASH' && badgeText === 'Cash')) {
-                    item.style.backgroundColor = 'rgba(0, 255, 136, 0.2)';
-                    item.style.borderColor = '#00ff88';
-                    item.style.boxShadow = '0 0 10px rgba(0, 255, 136, 0.3)';
-                    item.style.transform = 'scale(1.02)';
-                    item.style.transition = 'all 0.2s ease';
-                }
+            const itemSymbol = item.dataset.symbol || item.querySelector('.symbol-badge')?.textContent;
+            if (!itemSymbol) {
+                return;
+            }
+
+            // Check for exact match or Cash/CASH equivalence
+            if (itemSymbol === symbol ||
+                (symbol === 'Cash' && itemSymbol === 'CASH') ||
+                (symbol === 'CASH' && itemSymbol === 'Cash')) {
+                applyHoldingHighlight(item, false);
             }
         });
     }
@@ -337,10 +371,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function clearHoldingsHighlight() {
         const holdingsItems = document.querySelectorAll('#holdings-list li');
         holdingsItems.forEach(item => {
-            item.style.backgroundColor = '';
-            item.style.borderColor = '';
-            item.style.boxShadow = '';
-            item.style.transform = '';
+            const itemSymbol = item.dataset.symbol || item.querySelector('.symbol-badge')?.textContent;
+            if (item.matches(':hover') ||
+                (activeHoldingSymbol && itemSymbol === activeHoldingSymbol) ||
+                (currentlyHighlightedSymbol && itemSymbol === currentlyHighlightedSymbol)) {
+                return;
+            }
+            resetHoldingHighlight(item);
         });
     }
 
@@ -365,6 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         portfolioPieChart.setActiveElements([]);
         portfolioPieChart.update('none');
+        currentlyHighlightedSymbol = null;
     }
 
     function updateHoldingsCrossHighlighting() {
@@ -383,22 +421,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 item.onmouseenter = () => {
+                    activeHoldingSymbol = symbol;
                     highlightPieChartSegment(symbol);
-                    item.style.backgroundColor = 'rgba(0, 255, 136, 0.1)';
-                    item.style.borderColor = '#00ff88';
-                    item.style.transform = 'scale(1.02)';
-                    item.style.transition = 'all 0.2s ease';
+                    applyHoldingHighlight(item);
                 };
                 
                 item.onmouseleave = () => {
+                    if (activeHoldingSymbol === symbol) {
+                        activeHoldingSymbol = null;
+                    }
                     clearPieChartHighlight();
-                    item.style.backgroundColor = '';
-                    item.style.borderColor = '';
-                    item.style.transform = '';
+                    resetHoldingHighlight(item);
                 };
                 
                 // Add cursor pointer
                 item.style.cursor = 'pointer';
+
+                // If the pointer is already over this item, immediately apply the hover styling
+                if (item.matches(':hover')) {
+                    activeHoldingSymbol = symbol;
+                    highlightPieChartSegment(symbol);
+                    applyHoldingHighlight(item, false);
+                } else if (activeHoldingSymbol && activeHoldingSymbol === symbol) {
+                    applyHoldingHighlight(item, false);
+                    highlightPieChartSegment(symbol);
+                } else if (currentlyHighlightedSymbol && currentlyHighlightedSymbol === symbol) {
+                    applyHoldingHighlight(item, false);
+                }
             }
         });
     }
@@ -832,7 +881,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     mode: 'nearest',
                     intersect: false,
                     backgroundColor: 'rgba(10, 14, 26, 0.95)',
-                    titleColor: '#00ff88',
+                    titleColor: themeAccentColor,
                     bodyColor: '#e2e8f0',
                     borderColor: '#2d3748',
                     borderWidth: 1,
@@ -1289,9 +1338,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateTransactionsTable();
                 }
                 
-                // Also refresh settlements whenever portfolio refreshes
-                loadSettlements();
-                
                 cashBalance.textContent = formatNumber(portfolio.cash, 2);
                 
                 // Fetch current prices to calculate market values
@@ -1309,7 +1355,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         
                         // Add cash as the first item in holdings list
                         const cashColor = '#00d4ff'; // Cash color for consistency
-                        const cashItem = `<li style="border-left: 3px solid ${cashColor}; padding-left: 12px; background: rgba(0, 0, 0, 0.3);">
+                        const cashItem = `<li data-symbol="Cash" style="border-left: 3px solid ${cashColor}; padding-left: 12px; background: rgba(0, 0, 0, 0.3);">
                             <span class="symbol-badge" style="background-color: ${cashColor}; margin-right: 8px;">CASH</span>
                             <span class="cash-value" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight: 600;">$${formatNumber(portfolio.cash, 2)}</span>
                         </li>`;
@@ -1331,7 +1377,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 const marketValueDisplay = marketValue ? ` <span style="color: #94a3b8; font-size: 11px; margin-left: 12px;">VALUE:</span> <span style="color: #7dda58; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatCurrencyLocale(marketValue)}</span>` : '';
                                 const vwapDisplay = vwap ? ` <span style="color: #94a3b8; font-size: 11px; margin-left: 12px;">VWAP:</span> <span style="color: #00d4ff; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatCurrencyLocale(vwap)}</span>` : '';
                                 
-                                const item = `<li style="border-left: 3px solid ${color}; padding-left: 12px; background: rgba(0, 0, 0, 0.3);">
+                                const item = `<li data-symbol="${symbol}" style="border-left: 3px solid ${color}; padding-left: 12px; background: rgba(0, 0, 0, 0.3);">
                                     <div style="display: flex; align-items: center; flex-wrap: wrap;">
                                         <span class="symbol-badge" style="background-color: ${color}; margin-right: 12px;">${symbol}</span>
                                         ${quantityDisplay}${marketValueDisplay}${vwapDisplay}
@@ -1345,9 +1391,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         createOrUpdatePortfoliePieChart();
                         
                         // Set up cross-highlighting after holdings list is updated
-                        setTimeout(() => {
-                            updateHoldingsCrossHighlighting();
-                        }, 100); // Small delay to ensure DOM is updated
+                        updateHoldingsCrossHighlighting();
                     })
                     .catch(error => {
                         // Error fetching assets for portfolio
@@ -1375,73 +1419,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateAssetsTable(assets);
             });
     });
-
-    function loadSettlements() {
-        // Load settlement history from API
-        fetch('/api/settlements')
-            .then(response => {
-                if (response.status === 401) {
-                    // User session expired
-                    return null;
-                }
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(settlements => {
-                const settlementsSection = document.querySelector('.settlements-section');
-                const settlementsTableBody = document.querySelector('#settlements-table tbody');
-                
-                if (!settlements || settlements.length === 0) {
-                    // Hide settlements section if no settlements
-                    if (settlementsSection) {
-                        settlementsSection.style.display = 'none';
-                    }
-                    cachedSettlements = [];
-                    return;
-                }
-                
-                // Check if settlements data has actually changed
-                const settlementsChanged = JSON.stringify(settlements) !== JSON.stringify(cachedSettlements);
-                
-                if (!settlementsChanged) {
-                    return;
-                }
-                
-                // Update cache
-                cachedSettlements = settlements;
-                
-                // Show and populate settlements section
-                if (settlementsSection) {
-                    settlementsSection.style.display = 'block';
-                }
-                
-                if (!settlementsTableBody) {
-                    return;
-                }
-                
-                settlementsTableBody.innerHTML = '';
-                
-                // Backend already sorts by newest first (settled_at DESC)
-                settlements.forEach(settlement => {
-                    const color = getInstrumentColor(settlement.symbol);
-                    const row = document.createElement('tr');
-                    row.className = 'settlement-row';
-                    row.innerHTML = `
-                        <td style="color: #94a3b8; font-size: 11px; white-space: nowrap;">${formatCompactDateTime(new Date(settlement.settled_at).getTime())}</td>
-                        <td><span class="symbol-badge" style="background-color: ${color};">${settlement.symbol}</span></td>
-                        <td style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">${formatQuantity(settlement.quantity)}</td>
-                        <td style="color: #00d4ff; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(settlement.settlement_price)}</td>
-                        <td style="color: #7dda58; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatCurrencyLocale(settlement.settlement_value)}</td>
-                    `;
-                    settlementsTableBody.appendChild(row);
-                });
-            })
-            .catch(error => {
-                // Error loading settlements
-            });
-    }
 
     // Handle new transactions
     socket.on('transaction_added', (transaction) => {
@@ -1481,7 +1458,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(response => response.json())
             .then(assets => {
                 updateAssetsTable(assets);  // This caches the colors from asset data
-                updatePortfolio();  // This will also refresh settlements
+                updatePortfolio();
                 updatePerformance();
             })
             .catch(error => {
@@ -1489,9 +1466,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     });
 
-    // Handle portfolio refresh signal (e.g., after settlements)
+    // Handle portfolio refresh signal
     socket.on('portfolio_refresh_needed', () => {
-        updatePortfolio();  // This will now also refresh settlements
+        updatePortfolio();
         updatePerformance();
         createOrUpdatePortfoliePieChart();
     });
@@ -1728,15 +1705,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize chart system
     initializeChartSystem();
-    
-    // Load settlement history
-    loadSettlements();
-    
-    // Periodically check for new settlements (every 30 seconds as backup)
-    setInterval(() => {
-        loadSettlements();
-    }, 30000);
-    
+
     // Set up symbol badge click handlers
     addSymbolBadgeClickHandlers();
 });

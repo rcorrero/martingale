@@ -1,6 +1,6 @@
 This favicon was generated using the following font:
 
-- Font Title: JetBrains Mono
+- Font Title: IBM Plex Sans
 - Font Author: undefined
-- Font Source: https://fonts.gstatic.com/s/jetbrainsmono/v23/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPVmUsaaDhw.ttf
+- Font Source: https://fonts.gstatic.com/s/ibmplexsans/v22/zYXGKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1swZSAXcomDVmadSD6llzAKI5loa26g.ttf
 - Font License: undefined)

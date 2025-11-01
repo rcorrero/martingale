@@ -12,194 +12,45 @@
     <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
     
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        body {
-            padding-bottom: 200px; /* Add space for footer */
-        }
-        
-        .auth-container {
-            max-width: 400px;
-            margin: 100px auto;
-            padding: 40px;
-            background: var(--terminal-surface);
-            border: 2px solid var(--terminal-border);
-            border-radius: 8px;
-            box-shadow: 0 4px 20px var(--terminal-shadow);
-        }
-        
-        .auth-container h1 {
-            color: var(--terminal-accent);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            font-weight: 600;
-            text-align: center;
-            margin-bottom: 30px;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        
-        .auth-form label {
-            color: var(--terminal-text);
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 11px;
-            letter-spacing: 1px;
-            display: block;
-            margin-bottom: 5px;
-        }
-        
-        .auth-form input {
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0 20px 0;
-            background: var(--terminal-bg);
-            border: 2px solid var(--terminal-border);
-            border-radius: 4px;
-            color: var(--terminal-text);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            box-sizing: border-box;
-            transition: all 0.2s ease;
-        }
-        
-        .auth-form input:focus {
-            border-color: var(--terminal-accent);
-            box-shadow: 0 0 10px rgba(0, 212, 170, 0.2);
-            outline: none;
-        }
-        
-        .auth-form button {
-            width: 100%;
-            padding: 12px;
-            background: var(--terminal-surface);
-            color: var(--terminal-success);
-            border: 2px solid var(--terminal-success);
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 13px;
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.2s ease;
-        }
-        
-        .auth-form button:hover {
-            background: var(--terminal-success);
-            color: var(--terminal-text);
-        }
-        
-        .auth-link {
-            text-align: center;
-            margin-top: 20px;
-        }
-        
-        .auth-link p {
-            color: var(--terminal-text-secondary);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-        }
-        
-        .auth-link a {
-            color: var(--terminal-accent);
-            text-decoration: none;
-            font-weight: 600;
-        }
-        
-        .auth-link a:hover {
-            color: var(--terminal-success);
-            text-decoration: underline;
-        }
-        
-        .flash-messages {
-            margin-bottom: 20px;
-        }
-        
-        .flash-message {
-            padding: 12px;
-            background: rgba(248, 81, 73, 0.1);
-            color: var(--terminal-danger);
-            border: 1px solid var(--terminal-danger);
-            border-radius: 4px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-        }
-        
-        /* Auth page footer styling */
-        .auth-footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--terminal-surface);
-            border-top: 2px solid var(--terminal-border);
-            padding: 15px 0;
-            text-align: center;
-        }
-        
-        .auth-footer-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-        }
-        
-        .auth-footer-disclaimer {
-            margin-bottom: 10px;
-            padding: 10px;
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            border-radius: 6px;
-            color: var(--terminal-text);
-            font-size: 12px;
-        }
-        
-        .auth-footer-disclaimer strong {
-            color: #ef4444;
-        }
-        
-        .auth-footer-copyright {
-            color: var(--terminal-text-secondary);
-            font-size: 11px;
-            margin: 0;
-            opacity: 0.8;
-        }
-    </style>
 </head>
-<body>
-    <div class="auth-container">
-        <h1>Login to Martingale</h1>
+<body class="auth-page">
+    <div class="auth-shell">
+        <div class="auth-card">
+            <h1>Welcome Back</h1>
+            <p class="lead">Sign in to access your Martingale trading terminal.</p>
         
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                <div class="flash-messages">
-                    {% for message in messages %}
-                        <div class="flash-message">{{ message }}</div>
-                    {% endfor %}
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for message in messages %}
+                            <div class="flash-message">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            
+            <form method="POST" class="auth-form">
+                {{ form.hidden_tag() }}
+                
+                <div>
+                    {{ form.username.label }}
+                    {{ form.username() }}
                 </div>
-            {% endif %}
-        {% endwith %}
-        
-        <form method="POST" class="auth-form">
-            {{ form.hidden_tag() }}
+                
+                <div>
+                    {{ form.password.label }}
+                    {{ form.password() }}
+                </div>
+                
+                <div>
+                    {{ form.submit(class_='auth-primary-btn') }}
+                </div>
+            </form>
             
-            <div>
-                {{ form.username.label }}
-                {{ form.username() }}
+            <div class="auth-link">
+                <p>Don't have an account? <a href="{{ url_for('register') }}">Create one</a></p>
+                <p><a href="{{ url_for('about') }}">Learn more about Martingale</a></p>
             </div>
-            
-            <div>
-                {{ form.password.label }}
-                {{ form.password() }}
-            </div>
-            
-            <div>
-                {{ form.submit() }}
-            </div>
-        </form>
-        
-        <div class="auth-link">
-            <p>Don't have an account? <a href="{{ url_for('register') }}">Register here</a></p>
-            <p><a href="{{ url_for('about') }}">About Martingale</a></p>
         </div>
     </div>
     

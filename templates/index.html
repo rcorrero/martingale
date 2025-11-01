@@ -70,7 +70,7 @@
             </div>
             <div class="assets-section">
                 <h2>Assets</h2>
-                <input type="text" id="asset-search" placeholder="ENTER SYMBOL" />
+                <input type="text" id="asset-search" placeholder="Enter Symbol" />
                 <div id="assets-container">
                     <table id="assets-table">
                         <thead>
@@ -123,31 +123,13 @@
                     </table>
                 </div>
             </div>
-            <div class="settlements-section" style="display: none;">
-                <h2>Settlement History</h2>
-                <div id="settlements-container">
-                    <table id="settlements-table">
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>Symbol</th>
-                                <th>Quantity</th>
-                                <th>Price</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
             <div class="trade-section">
                 <h2>Trade</h2>
                 <form id="trade-form">
-                    <input type="text" id="asset-input" placeholder="Enter symbol" list="asset-suggestions">
+                    <input type="text" id="asset-input" placeholder="Enter Symbol" list="asset-suggestions">
                     <datalist id="asset-suggestions">
                     </datalist>
-                    <input type="number" id="quantity-input" placeholder="QUANTITY" min="0" step="any">
+                    <input type="number" id="quantity-input" placeholder="Quantity" min="0" step="any">
                     <button type="submit" name="trade-type" value="buy">Buy</button>
                     <button type="submit" name="trade-type" value="sell">Sell</button>
                     <button type="button" id="sell-all-btn">Sell All Positions</button>
@@ -159,7 +141,7 @@
             <h2>Price History</h2>
             <div class="chart-controls">
                 <div class="chart-control-row">
-                    <label for="chart-count">NUMBER OF CHARTS:</label>
+                    <label for="chart-count">Number of Charts:</label>
                     <select id="chart-count">
                         <option value="1" selected>1</option>
                         <option value="2">2</option>
