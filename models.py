@@ -4,12 +4,17 @@ Database models for Martingale trading platform.
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import random
 import string
 
 db = SQLAlchemy()
+
+
+def current_utc() -> datetime:
+    """Return naive UTC timestamp derived from timezone-aware clock."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class User(UserMixin, db.Model):
     """User model for authentication."""
@@ -18,7 +23,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)  # Increased from 120 to 255 for scrypt hashes
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=current_utc)
     
     # Relationship to portfolio
     portfolio = db.relationship('Portfolio', backref='user', uselist=False, cascade='all, delete-orphan')
@@ -44,23 +49,109 @@ class Portfolio(db.Model):
     cash = db.Column(db.Float, default=100000.0)
     holdings = db.Column(db.Text, default='{}')  # JSON string of holdings
     position_info = db.Column(db.Text, default='{}')  # JSON string of position info
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=current_utc, onupdate=current_utc)
     
+    @staticmethod
+    def _normalize_asset_id(raw_key):
+        """Convert stored key (id or legacy symbol) into an asset id."""
+        if raw_key is None:
+            return None
+        if isinstance(raw_key, int):
+            return raw_key
+        if isinstance(raw_key, str):
+            stripped = raw_key.strip()
+            if stripped.isdigit():
+                return int(stripped)
+            # Legacy storage by symbol name
+            asset = Asset.query.filter_by(symbol=stripped).order_by(Asset.created_at.desc()).first()
+            return asset.id if asset else None
+        try:
+            return int(raw_key)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _serialize_holdings(holdings_map):
+        if not holdings_map:
+            return '{}'
+        normalized = {str(int(asset_id)): float(quantity) for asset_id, quantity in holdings_map.items() if asset_id is not None}
+        return json.dumps(normalized)
+
+    @staticmethod
+    def _serialize_position_info(position_map):
+        if not position_map:
+            return '{}'
+        normalized = {}
+        for asset_id, info in position_map.items():
+            if asset_id is None:
+                continue
+            normalized[str(int(asset_id))] = {
+                'total_cost': float(info.get('total_cost', 0.0)),
+                'total_quantity': float(info.get('total_quantity', 0.0))
+            }
+        return json.dumps(normalized)
+
+    def get_holdings_map(self):
+        """Return holdings keyed by asset id (int -> float)."""
+        raw = json.loads(self.holdings) if self.holdings else {}
+        normalized = {}
+        for raw_key, quantity in raw.items():
+            asset_id = self._normalize_asset_id(raw_key)
+            if asset_id is not None:
+                normalized[asset_id] = float(quantity)
+        return normalized
+
+    def set_holdings(self, holdings_map):
+        """Persist holdings keyed by asset id."""
+        self.holdings = self._serialize_holdings(holdings_map)
+
+    def get_holdings_by_symbol(self):
+        """Return holdings keyed by asset symbol for presentation purposes."""
+        holdings = self.get_holdings_map()
+        if not holdings:
+            return {}
+        assets = Asset.query.filter(Asset.id.in_(holdings.keys())).all()
+        id_to_symbol = {asset.id: asset.symbol for asset in assets if asset.symbol}
+        return {id_to_symbol[asset_id]: holdings[asset_id] for asset_id in holdings if asset_id in id_to_symbol}
+
+    def get_position_info_map(self):
+        """Return position metadata keyed by asset id."""
+        raw = json.loads(self.position_info) if self.position_info else {}
+        normalized = {}
+        for raw_key, info in raw.items():
+            asset_id = self._normalize_asset_id(raw_key)
+            if asset_id is None:
+                continue
+            normalized[asset_id] = {
+                'total_cost': float(info.get('total_cost', 0.0)) if info else 0.0,
+                'total_quantity': float(info.get('total_quantity', 0.0)) if info else 0.0
+            }
+        return normalized
+
+    def set_position_info(self, position_map):
+        """Persist position info keyed by asset id."""
+        self.position_info = self._serialize_position_info(position_map)
+
+    def get_position_info_by_symbol(self):
+        """Return position info keyed by asset symbol for presentation."""
+        position_map = self.get_position_info_map()
+        if not position_map:
+            return {}
+        assets = Asset.query.filter(Asset.id.in_(position_map.keys())).all()
+        id_to_symbol = {asset.id: asset.symbol for asset in assets if asset.symbol}
+        result = {}
+        for asset_id, info in position_map.items():
+            symbol = id_to_symbol.get(asset_id)
+            if symbol:
+                result[symbol] = info
+        return result
+
+    # Backwards-compatible accessors used throughout the application
     def get_holdings(self):
-        """Get holdings as dictionary."""
-        return json.loads(self.holdings) if self.holdings else {}
-    
-    def set_holdings(self, holdings_dict):
-        """Set holdings from dictionary."""
-        self.holdings = json.dumps(holdings_dict)
-    
+        return self.get_holdings_map()
+
     def get_position_info(self):
-        """Get position info as dictionary."""
-        return json.loads(self.position_info) if self.position_info else {}
-    
-    def set_position_info(self, position_dict):
-        """Set position info from dictionary."""
-        self.position_info = json.dumps(position_dict)
+        return self.get_position_info_map()
 
 class Transaction(db.Model):
     """Transaction model for trade history."""
@@ -68,13 +159,24 @@ class Transaction(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=False, index=True)
+    legacy_symbol = db.Column('symbol', db.String(10), nullable=False)
     timestamp = db.Column(db.Float, nullable=False)
-    symbol = db.Column(db.String(10), nullable=False)
-    type = db.Column(db.String(10), nullable=False)  # 'buy' or 'sell'
+    type = db.Column(db.String(10), nullable=False)  # 'buy', 'sell', or 'settlement'
     quantity = db.Column(db.Float, nullable=False)
     price = db.Column(db.Float, nullable=False)
     total_cost = db.Column(db.Float, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=current_utc)
+
+    # Relationships
+    asset = db.relationship('Asset', back_populates='transactions', lazy='joined')
+
+    @property
+    def symbol(self):
+        """Convenience access to the asset symbol."""
+        if self.asset and self.asset.symbol:
+            return self.asset.symbol
+        return self.legacy_symbol
 
 class PriceData(db.Model):
     """Price data model for asset prices."""
@@ -85,7 +187,7 @@ class PriceData(db.Model):
     current_price = db.Column(db.Float, nullable=False)
     volatility = db.Column(db.Float, default=0.02)
     history = db.Column(db.Text, default='[]')  # JSON string of price history
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=current_utc, onupdate=current_utc)
     
     def get_history(self):
         """Get price history as list."""
@@ -118,14 +220,15 @@ class Asset(db.Model):
     current_price = db.Column(db.Float, nullable=False)
     volatility = db.Column(db.Float, default=0.02)
     color = db.Column(db.String(7), nullable=False)  # Hex color code
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=current_utc, nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False, index=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False, index=True)
     final_price = db.Column(db.Float, nullable=True)  # Set when asset expires
     settled_at = db.Column(db.DateTime, nullable=True)  # When settlement occurred
     
     # Relationships
-    settlements = db.relationship('Settlement', backref='asset', cascade='all, delete-orphan')
+    settlements = db.relationship('Settlement', back_populates='asset', cascade='all, delete-orphan')
+    transactions = db.relationship('Transaction', back_populates='asset', cascade='all, delete-orphan')
     
     # Color palette for random assignment
     COLOR_PALETTE = [
@@ -175,9 +278,9 @@ class Asset(db.Model):
             minutes_to_expiry = random.expovariate(lambda_param)
             # Clamp between 5 and 480 minutes
             minutes_to_expiry = max(5, min(480, minutes_to_expiry))
-        
-        expires_at = datetime.utcnow() + timedelta(minutes=minutes_to_expiry)
-        
+
+        expires_at = current_utc() + timedelta(minutes=minutes_to_expiry)
+
         asset = Asset(
             symbol=symbol,
             initial_price=initial_price,
@@ -198,7 +301,7 @@ class Asset(db.Model):
         """
         self.is_active = False
         self.final_price = final_price if final_price is not None else self.current_price
-        self.settled_at = datetime.utcnow()
+        self.settled_at = current_utc()
     
     def time_to_expiry(self):
         """Get time remaining until expiration.
@@ -209,7 +312,7 @@ class Asset(db.Model):
         if not self.is_active:
             return None
         
-        now = datetime.utcnow()
+        now = current_utc()
         if now >= self.expires_at:
             return timedelta(0)
         
@@ -217,7 +320,7 @@ class Asset(db.Model):
     
     def is_expired(self):
         """Check if asset has expired."""
-        return datetime.utcnow() >= self.expires_at
+        return current_utc() >= self.expires_at
     
     def to_dict(self):
         """Convert asset to dictionary for API responses."""
@@ -246,14 +349,21 @@ class Settlement(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     asset_id = db.Column(db.Integer, db.ForeignKey('assets.id'), nullable=False)
-    symbol = db.Column(db.String(10), nullable=False)  # Denormalized for easy access
+    legacy_symbol = db.Column('symbol', db.String(10), nullable=False)
     quantity = db.Column(db.Float, nullable=False)
     settlement_price = db.Column(db.Float, nullable=False)
     settlement_value = db.Column(db.Float, nullable=False)  # quantity * settlement_price
-    settled_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    settled_at = db.Column(db.DateTime, default=current_utc, nullable=False)
     
     # Relationship
     user = db.relationship('User', backref='settlements')
+    asset = db.relationship('Asset', back_populates='settlements', lazy='joined')
+    
+    @property
+    def symbol(self):
+        """Convenience accessor for asset symbol."""
+        return self.asset.symbol if self.asset else None
     
     def __repr__(self):
-        return f'<Settlement {self.symbol} user={self.user_id} qty={self.quantity} value={self.settlement_value}>'
+        display_symbol = self.symbol or self.legacy_symbol
+        return f'<Settlement {display_symbol} user={self.user_id} qty={self.quantity} value={self.settlement_value}>'

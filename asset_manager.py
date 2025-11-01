@@ -4,8 +4,8 @@ Handles creation, expiration, settlement, and automatic replacement.
 """
 import logging
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional
-from models import db, Asset, Settlement, Portfolio, Transaction, User
+from typing import List, Dict, Optional, Any
+from models import db, Asset, Settlement, Portfolio, Transaction, User, current_utc
 import time
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ class AssetManager:
         Returns:
             List of expired Asset objects
         """
-        query = Asset.query.filter(Asset.expires_at <= datetime.utcnow())
+        query = Asset.query.filter(Asset.expires_at <= current_utc())
         
         if unsettled_only:
             query = query.filter_by(is_active=True)
@@ -98,15 +98,15 @@ class AssetManager:
             for portfolio in portfolios:
                 holdings = portfolio.get_holdings()
                 
-                if asset.symbol in holdings and holdings[asset.symbol] > 0:
-                    quantity = holdings[asset.symbol]
+                if asset.id in holdings and holdings[asset.id] > 0:
+                    quantity = holdings[asset.id]
                     settlement_value = quantity * asset.final_price
                     
                     # Create settlement record
                     settlement = Settlement(
                         user_id=portfolio.user_id,
                         asset_id=asset.id,
-                        symbol=asset.symbol,
+                        legacy_symbol=asset.symbol,
                         quantity=quantity,
                         settlement_price=asset.final_price,
                         settlement_value=settlement_value
@@ -118,21 +118,22 @@ class AssetManager:
                     
                     # Remove holding - DELETE the key entirely
                     holdings = portfolio.get_holdings()
-                    if asset.symbol in holdings:
-                        del holdings[asset.symbol]
+                    if asset.id in holdings:
+                        del holdings[asset.id]
                     portfolio.set_holdings(holdings)
                     
                     # Clear position info
                     position_info = portfolio.get_position_info()
-                    if asset.symbol in position_info:
-                        del position_info[asset.symbol]
+                    if asset.id in position_info:
+                        del position_info[asset.id]
                         portfolio.set_position_info(position_info)
                     
                     # Create settlement transaction for history
                     transaction = Transaction(
                         user_id=portfolio.user_id,
+                        asset_id=asset.id,
+                        legacy_symbol=asset.symbol,
                         timestamp=time.time() * 1000,
-                        symbol=asset.symbol,
                         type='settlement',
                         quantity=quantity,
                         price=asset.final_price,
@@ -143,11 +144,12 @@ class AssetManager:
                     # Store transaction data for emission after commit
                     transaction_data = {
                         'timestamp': transaction.timestamp,
-                        'symbol': transaction.symbol,
+                        'symbol': asset.symbol,
                         'type': transaction.type,
                         'quantity': transaction.quantity,
                         'price': transaction.price,
                         'total_cost': transaction.total_cost,  # Use total_cost not total!
+                        'asset_id': transaction.asset_id,
                         'user_id': portfolio.user_id
                     }
                     stats['transactions'].append(transaction_data)
@@ -182,7 +184,7 @@ class AssetManager:
             db.session.add(asset)
             new_assets.append(asset)
             
-            time_to_expiry = (asset.expires_at - datetime.utcnow()).total_seconds() / 60
+            time_to_expiry = (asset.expires_at - current_utc()).total_seconds() / 60
             logger.info(f"Created new asset {asset.symbol} with volatility {asset.volatility:.4f}, expires in {time_to_expiry:.1f} minutes")
         
         db.session.commit()
@@ -205,7 +207,7 @@ class AssetManager:
         
         return new_assets
     
-    def maintain_asset_pool(self) -> Dict[str, any]:
+    def maintain_asset_pool(self) -> Dict[str, Any]:
         """Ensure minimum number of active assets by creating replacements.
         
         Returns:
@@ -236,16 +238,15 @@ class AssetManager:
         Returns:
             List of created assets
         """
-        if count is None:
-            count = self.min_active_assets
+        create_count = self.min_active_assets if count is None else count
         
         existing_active = self.get_active_assets()
         if existing_active:
             logger.info(f"Asset pool already has {len(existing_active)} active assets")
             return existing_active
         
-        logger.info(f"Initializing asset pool with {count} assets")
-        return self.create_new_assets(count=count)
+        logger.info(f"Initializing asset pool with {create_count} assets")
+        return self.create_new_assets(count=create_count)
     
     def cleanup_old_assets(self, days_old: int = 30) -> int:
         """Remove old expired assets from database to prevent bloat.
@@ -256,7 +257,7 @@ class AssetManager:
         Returns:
             Number of assets removed
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+        cutoff_date = current_utc() - timedelta(days=days_old)
         
         old_assets = Asset.query.filter(
             Asset.is_active == False,
@@ -276,7 +277,7 @@ class AssetManager:
         
         return count
     
-    def process_expirations(self) -> Dict[str, any]:
+    def process_expirations(self) -> Dict[str, Any]:
         """Main processing loop - check expirations, settle, create replacements.
         
         Returns:
@@ -287,7 +288,7 @@ class AssetManager:
         # Step 1: Check and expire assets
         expired_assets = self.check_and_expire_assets()
         
-        stats = {
+        stats: Dict[str, Any] = {
             'expired_assets': len(expired_assets),
             'settlement_stats': {},
             'maintenance_stats': {}
@@ -301,14 +302,16 @@ class AssetManager:
             
             # Emit settlement transactions AFTER database commit
             logger.info(f"Settlement stats: {settlement_stats}")
-            logger.info(f"Transactions to emit: {len(settlement_stats.get('transactions', []))}")
+            transactions_value = settlement_stats.get('transactions')
+            transactions: List[Dict[str, Any]] = transactions_value if isinstance(transactions_value, list) else []
+            logger.info(f"Transactions to emit: {len(transactions)}")
             logger.info(f"SocketIO available: {self.socketio is not None}")
             
-            if self.socketio and settlement_stats.get('transactions'):
-                for transaction_data in settlement_stats['transactions']:
+            if self.socketio and transactions:
+                for transaction_data in transactions:
                     logger.info(f"Emitting transaction_added: {transaction_data}")
                     # Broadcast to all clients - frontend will filter by user
-                    self.socketio.emit('transaction_added', transaction_data, broadcast=True)
+                    self.socketio.emit('transaction_added', transaction_data)
                     logger.info(f"Emitting global_transaction_update: {transaction_data}")
                     # Also broadcast to all clients for Time & Sales
                     self.socketio.emit('global_transaction_update', transaction_data)
@@ -316,7 +319,7 @@ class AssetManager:
             else:
                 if not self.socketio:
                     logger.error("SocketIO is None - cannot emit settlement transactions!")
-                if not settlement_stats.get('transactions'):
+                if not transactions:
                     logger.warning("No transactions to emit in settlement_stats")
             
             # Remove expired assets from price service
@@ -333,7 +336,7 @@ class AssetManager:
         logger.info(f"Expiration processing complete: {stats}")
         return stats
     
-    def get_asset_summary(self) -> Dict[str, any]:
+    def get_asset_summary(self) -> Dict[str, Any]:
         """Get summary of current asset state.
         
         Returns:
@@ -344,10 +347,8 @@ class AssetManager:
         expired_settled = self.get_expired_assets(unsettled_only=False)
         
         # Calculate average time to expiry for active assets
-        if active_assets:
-            avg_ttl = sum(a.time_to_expiry().total_seconds() for a in active_assets) / len(active_assets)
-        else:
-            avg_ttl = 0
+        ttl_seconds = [ttl.total_seconds() for ttl in (a.time_to_expiry() for a in active_assets) if ttl]
+        avg_ttl = (sum(ttl_seconds) / len(ttl_seconds)) if ttl_seconds else 0
         
         return {
             'active_count': len(active_assets),
@@ -359,7 +360,7 @@ class AssetManager:
                 {
                     'symbol': a.symbol,
                     'expires_at': a.expires_at.isoformat(),
-                    'hours_remaining': a.time_to_expiry().total_seconds() / 3600
+                    'hours_remaining': (ttl.total_seconds() / 3600) if (ttl := a.time_to_expiry()) else 0
                 }
                 for a in sorted(active_assets, key=lambda x: x.expires_at)[:5]
             ]

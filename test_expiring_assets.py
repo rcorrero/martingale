@@ -4,13 +4,13 @@ Run this to verify the asset lifecycle works correctly.
 """
 import sys
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app import app, db
-from models import Asset, User, Portfolio, Settlement, Transaction
+from models import Asset, User, Portfolio, Settlement, Transaction, current_utc
 from asset_manager import AssetManager
 from config import config
 
@@ -20,9 +20,9 @@ def test_asset_creation():
     
     with app.app_context():
         # Create a few test assets
-        asset1 = Asset.create_new_asset(initial_price=100.0, days_to_expiry=1)
-        asset2 = Asset.create_new_asset(initial_price=100.0, days_to_expiry=15)
-        asset3 = Asset.create_new_asset(initial_price=100.0, days_to_expiry=30)
+        asset1 = Asset.create_new_asset(initial_price=100.0, minutes_to_expiry=1440)
+        asset2 = Asset.create_new_asset(initial_price=100.0, minutes_to_expiry=21600)
+        asset3 = Asset.create_new_asset(initial_price=100.0, minutes_to_expiry=43200)
         
         db.session.add_all([asset1, asset2, asset3])
         db.session.commit()
@@ -48,7 +48,7 @@ def test_asset_expiration():
             initial_price=100.0,
             current_price=105.0,
             volatility=0.05,
-            expires_at=datetime.utcnow() + timedelta(seconds=1),
+            expires_at=current_utc() + timedelta(seconds=1),
             is_active=True
         )
         db.session.add(asset)
@@ -96,7 +96,7 @@ def test_settlement():
             initial_price=100.0,
             current_price=110.0,
             volatility=0.05,
-            expires_at=datetime.utcnow() - timedelta(seconds=1),
+            expires_at=current_utc() - timedelta(seconds=1),
             is_active=True
         )
         db.session.add(asset)
@@ -104,11 +104,11 @@ def test_settlement():
         
         # Add holding
         holdings = portfolio.get_holdings()
-        holdings[asset.symbol] = 10.0
+        holdings[asset.id] = 10.0
         portfolio.set_holdings(holdings)
-        
+
         position_info = portfolio.get_position_info()
-        position_info[asset.symbol] = {'total_cost': 1000.0, 'total_quantity': 10.0}
+        position_info[asset.id] = {'total_cost': 1000.0, 'total_quantity': 10.0}
         portfolio.set_position_info(position_info)
         
         initial_cash = portfolio.cash
@@ -127,7 +127,7 @@ def test_settlement():
         settlement = Settlement(
             user_id=user.id,
             asset_id=asset.id,
-            symbol=asset.symbol,
+            legacy_symbol=asset.symbol,
             quantity=10.0,
             settlement_price=110.0,
             settlement_value=settlement_value
@@ -137,7 +137,7 @@ def test_settlement():
         # Update portfolio
         portfolio.cash += settlement_value
         holdings = portfolio.get_holdings()
-        holdings[asset.symbol] = 0
+        holdings[asset.id] = 0
         portfolio.set_holdings(holdings)
         
         db.session.commit()
@@ -161,7 +161,13 @@ def test_asset_manager():
         
         for asset in assets[:3]:
             ttl = asset.time_to_expiry()
-            print(f"  - {asset.symbol}: volatility={asset.volatility:.4f}, expires in {ttl.days} days {ttl.seconds//3600} hours")
+            if ttl:
+                days = ttl.days
+                hours = ttl.seconds // 3600
+            else:
+                days = 0
+                hours = 0
+            print(f"  - {asset.symbol}: volatility={asset.volatility:.4f}, expires in {days} days {hours} hours")
         
         # Get summary
         summary = manager.get_asset_summary()
@@ -190,7 +196,7 @@ def test_full_lifecycle():
             initial_price=100.0,
             current_price=100.0,
             volatility=0.05,
-            expires_at=datetime.utcnow() + timedelta(seconds=2),
+            expires_at=current_utc() + timedelta(seconds=2),
             is_active=True
         )
         db.session.add(asset)
@@ -213,11 +219,11 @@ def test_full_lifecycle():
             db.session.add(portfolio)
         
         holdings = portfolio.get_holdings()
-        holdings[asset.symbol] = 5.0
+        holdings[asset.id] = 5.0
         portfolio.set_holdings(holdings)
-        
+
         position_info = portfolio.get_position_info()
-        position_info[asset.symbol] = {'total_cost': 500.0, 'total_quantity': 5.0}
+        position_info[asset.id] = {'total_cost': 500.0, 'total_quantity': 5.0}
         portfolio.set_position_info(position_info)
         
         initial_cash = portfolio.cash
@@ -250,7 +256,7 @@ def test_full_lifecycle():
         print(f"  - Cash increase: ${portfolio.cash - initial_cash:.2f}")
         
         # Verify settlement record
-        settlement = Settlement.query.filter_by(user_id=user.id, symbol=asset.symbol).first()
+        settlement = Settlement.query.filter_by(user_id=user.id, asset_id=asset.id).first()
         if settlement:
             print(f"✓ Settlement record created:")
             print(f"  - Quantity: {settlement.quantity}")

@@ -3,12 +3,12 @@
 Add an asset that expires in 5 minutes for testing.
 """
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 os.environ.setdefault('FLASK_ENV', 'development')
 
 from app import create_app
-from models import db, Asset
+from models import db, Asset, current_utc
 
 def add_short_expiry_asset():
     """Add an asset that expires in 5 minutes."""
@@ -18,7 +18,7 @@ def add_short_expiry_asset():
         try:
             # Create asset with 5 minute expiration
             minutes_to_expiry = 1
-            expires_at = datetime.utcnow() + timedelta(minutes=minutes_to_expiry)
+            expires_at = current_utc() + timedelta(minutes=minutes_to_expiry)
             
             symbol = Asset.generate_symbol()
             

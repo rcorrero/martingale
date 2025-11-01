@@ -4,8 +4,7 @@ import os
 os.environ.setdefault('FLASK_ENV', 'development')
 
 from app import create_app
-from models import Asset
-from datetime import datetime
+from models import Asset, current_utc
 
 app = create_app()
 
@@ -29,7 +28,7 @@ with app.app_context():
         print(f"{'-'*80}")
         
         for asset in sorted(active_assets, key=lambda a: a.expires_at):
-            now = datetime.utcnow()
+            now = current_utc()
             hours_until = (asset.expires_at - now).total_seconds() / 3600
             days_until = hours_until / 24
             

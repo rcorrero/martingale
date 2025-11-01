@@ -10,8 +10,7 @@ import os
 os.environ.setdefault('FLASK_ENV', 'development')
 
 from app import create_app
-from models import db, Asset, Portfolio, Settlement
-from datetime import datetime
+from models import db, Asset, Portfolio, Settlement, current_utc
 
 def reset_assets():
     """Reset asset pool to 16 minute-based assets."""
@@ -34,7 +33,7 @@ def reset_assets():
             # Step 2: Check expiration times of current active assets
             if active_assets:
                 print(f"\nCurrent active asset expiration times:")
-                now = datetime.utcnow()
+                now = current_utc()
                 for asset in sorted(active_assets, key=lambda a: a.expires_at):
                     hours_until = (asset.expires_at - now).total_seconds() / 3600
                     days_until = hours_until / 24
@@ -52,15 +51,15 @@ def reset_assets():
                     portfolios = Portfolio.query.all()
                     for portfolio in portfolios:
                         holdings = portfolio.get_holdings()
-                        if asset.symbol in holdings and holdings[asset.symbol] > 0:
-                            quantity = holdings[asset.symbol]
+                        if asset.id in holdings and holdings[asset.id] > 0:
+                            quantity = holdings[asset.id]
                             value = quantity * asset.current_price
                             
                             # Create settlement record
                             settlement = Settlement(
                                 user_id=portfolio.user_id,
                                 asset_id=asset.id,
-                                symbol=asset.symbol,
+                                legacy_symbol=asset.symbol,
                                 quantity=quantity,
                                 settlement_price=asset.current_price,
                                 settlement_value=value
@@ -71,13 +70,13 @@ def reset_assets():
                             portfolio.cash += value
                             
                             # Remove holding
-                            del holdings[asset.symbol]
+                            del holdings[asset.id]
                             portfolio.set_holdings(holdings)
                             
                             # Remove position info
                             position_info = portfolio.get_position_info()
-                            if asset.symbol in position_info:
-                                del position_info[asset.symbol]
+                            if asset.id in position_info:
+                                del position_info[asset.id]
                                 portfolio.set_position_info(position_info)
                             
                             print(f"  ✓ Settled {quantity} {asset.symbol} for user {portfolio.user_id}: ${value:.2f}")
@@ -98,7 +97,7 @@ def reset_assets():
                 db.session.add(asset)
                 new_assets.append(asset)
                 
-                time_to_expiry_minutes = (asset.expires_at - datetime.utcnow()).total_seconds() / 60
+                time_to_expiry_minutes = (asset.expires_at - current_utc()).total_seconds() / 60
                 print(f"  {i+1:2d}. {asset.symbol}: "
                       f"volatility={asset.volatility*100:5.2f}%, "
                       f"expires in {time_to_expiry_minutes:6.1f} minutes "

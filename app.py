@@ -15,9 +15,11 @@ import os
 import logging
 import re
 from datetime import datetime, timedelta
+from sqlalchemy import inspect, text, or_
+from sqlalchemy.exc import SQLAlchemyError
 from config import config
 from price_client import HybridPriceService
-from models import db, User, Portfolio, Transaction, PriceData, Asset, Settlement
+from models import db, User, Portfolio, Transaction, PriceData, Asset, Settlement, current_utc
 from asset_manager import AssetManager
 
 # Configure logging
@@ -56,6 +58,101 @@ def create_app(config_name='default'):
 config_name = os.environ.get('FLASK_ENV', 'development')
 app = create_app(config_name)
 socketio = SocketIO(app)
+
+
+def ensure_transaction_asset_schema():
+    """Ensure transactions table has asset_id column and backfill values."""
+    with app.app_context():
+        try:
+            inspector = inspect(db.engine)
+            if 'transactions' not in inspector.get_table_names():
+                return
+
+            column_names = {col['name'] for col in inspector.get_columns('transactions')}
+            if 'asset_id' not in column_names:
+                logger.info("Adding asset_id column to transactions table")
+                with db.engine.begin() as conn:
+                    conn.execute(text('ALTER TABLE transactions ADD COLUMN asset_id INTEGER'))
+
+            # Ensure supporting index exists (no-op if already present)
+            with db.engine.begin() as conn:
+                conn.execute(text('CREATE INDEX IF NOT EXISTS ix_transactions_asset_id ON transactions(asset_id)'))
+
+            # Backfill asset_id for historical transactions
+            missing_transactions = Transaction.query.filter(Transaction.asset_id.is_(None)).all()
+            if missing_transactions:
+                logger.info("Backfilling asset_id for %d transactions", len(missing_transactions))
+                for transaction in missing_transactions:
+                    asset = Asset.query.filter_by(symbol=transaction.symbol).order_by(Asset.created_at.desc()).first()
+                    if asset:
+                        transaction.asset_id = asset.id
+                db.session.commit()
+
+            missing_symbols = Transaction.query.filter(or_(Transaction.legacy_symbol.is_(None), Transaction.legacy_symbol == '')).all()
+            if missing_symbols:
+                logger.info("Backfilling legacy symbols for %d transactions", len(missing_symbols))
+                for transaction in missing_symbols:
+                    if transaction.asset:
+                        transaction.legacy_symbol = transaction.asset.symbol
+                    elif transaction.asset_id:
+                        asset = Asset.query.get(transaction.asset_id)
+                        if asset:
+                            transaction.legacy_symbol = asset.symbol
+                db.session.commit()
+
+        except SQLAlchemyError as exc:
+            logger.error("Schema synchronization failed: %s", exc)
+            db.session.rollback()
+
+
+ensure_transaction_asset_schema()
+
+
+def ensure_settlement_asset_schema():
+    """Ensure settlements table uses asset_id while preserving legacy symbol column."""
+    with app.app_context():
+        try:
+            inspector = inspect(db.engine)
+            if 'settlements' not in inspector.get_table_names():
+                return
+
+            column_names = {col['name'] for col in inspector.get_columns('settlements')}
+            if 'asset_id' not in column_names:
+                logger.info("Adding asset_id column to settlements table")
+                with db.engine.begin() as conn:
+                    conn.execute(text('ALTER TABLE settlements ADD COLUMN asset_id INTEGER'))
+
+            if 'symbol' not in column_names:
+                logger.info("Adding legacy symbol column to settlements table")
+                with db.engine.begin() as conn:
+                    conn.execute(text('ALTER TABLE settlements ADD COLUMN symbol VARCHAR(10)'))
+
+            missing_asset_ids = Settlement.query.filter(Settlement.asset_id.is_(None)).all()
+            if missing_asset_ids:
+                logger.info("Backfilling asset_id for %d settlement records", len(missing_asset_ids))
+                for settlement in missing_asset_ids:
+                    legacy_symbol = settlement.legacy_symbol
+                    if legacy_symbol:
+                        asset = Asset.query.filter_by(symbol=legacy_symbol).order_by(Asset.created_at.desc()).first()
+                        if asset:
+                            settlement.asset_id = asset.id
+
+            missing_symbols = Settlement.query.filter(or_(Settlement.legacy_symbol.is_(None), Settlement.legacy_symbol == '')).all()
+            if missing_symbols:
+                logger.info("Backfilling legacy symbol for %d settlement records", len(missing_symbols))
+                for settlement in missing_symbols:
+                    if settlement.asset:
+                        settlement.legacy_symbol = settlement.asset.symbol
+
+            if missing_asset_ids or missing_symbols:
+                db.session.commit()
+
+        except SQLAlchemyError as exc:
+            logger.error("Settlement schema synchronization failed: %s", exc)
+            db.session.rollback()
+
+
+ensure_settlement_asset_schema()
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -159,10 +256,24 @@ def add_global_transaction(transaction_data):
     """Add a transaction to the database."""
     user = User.query.filter_by(username=transaction_data['username']).first()
     if user:
+        asset = None
+        asset_id = transaction_data.get('asset_id')
+        if asset_id is not None:
+            asset = Asset.query.get(asset_id)
+        if not asset:
+            symbol = transaction_data.get('symbol')
+            if symbol:
+                asset = Asset.query.filter_by(symbol=symbol).order_by(Asset.created_at.desc()).first()
+        if not asset:
+            logger.error("Unable to record transaction; asset reference missing or not found")
+            return
+
         transaction = Transaction(
             user_id=user.id,
-            symbol=transaction_data['symbol'],
-            transaction_type=transaction_data['type'],
+            asset_id=asset.id,
+            legacy_symbol=asset.symbol,
+            timestamp=transaction_data.get('timestamp', time.time() * 1000),
+            type=transaction_data['type'],
             quantity=transaction_data['quantity'],
             price=transaction_data['price'],
             total_cost=transaction_data['total_cost']
@@ -173,7 +284,7 @@ def add_global_transaction(transaction_data):
 # Initialize price service (hybrid mode - uses API if available, fallback otherwise)
 price_service = HybridPriceService(
     assets_config=app.config['ASSETS'],
-    api_url=os.environ.get('PRICE_SERVICE_URL', 'http://localhost:5001')
+    api_url=app.config.get('PRICE_SERVICE_URL')
 )
 
 # Initialize asset manager
@@ -291,16 +402,19 @@ def about():
 @login_required
 def get_portfolio():
     portfolio = get_user_portfolio(current_user)
+    holdings_by_symbol = portfolio.get_holdings_by_symbol()
+    position_info_by_symbol = portfolio.get_position_info_by_symbol()
     
     return jsonify({
         'user_id': current_user.id,
         'cash': portfolio.cash,
-        'holdings': portfolio.get_holdings(),
-        'position_info': portfolio.get_position_info(),
+        'holdings': holdings_by_symbol,
+        'position_info': position_info_by_symbol,
         'transactions': [{
             'timestamp': int(t.timestamp),  # t.timestamp is already a float in milliseconds
             'symbol': t.symbol,
             'type': t.type,  # Use 'type' not 'transaction_type'
+            'asset_id': t.asset_id,
             'quantity': t.quantity,
             'price': t.price,
             'total_cost': t.total_cost
@@ -335,6 +449,11 @@ def get_performance():
     holdings = portfolio.get_holdings()
     position_info = portfolio.get_position_info()
     logger.info(f"Holdings: {holdings}, Position info: {position_info}")
+
+    asset_lookup = {}
+    if holdings:
+        assets = Asset.query.filter(Asset.id.in_(holdings.keys())).all()
+        asset_lookup = {asset.id: asset for asset in assets}
     
     # Validate that total_portfolio_value is not NaN before proceeding
     if total_portfolio_value != total_portfolio_value:  # Check for NaN
@@ -342,11 +461,19 @@ def get_performance():
         total_portfolio_value = 100000.0  # Default to initial cash
     
     # Calculate current market value of holdings and unrealized P&L (only for active assets)
-    for symbol, quantity in holdings.items():
+    for asset_id, quantity in holdings.items():
         try:
-            # Skip if asset is not active (expired assets have been settled)
-            if quantity > 0 and symbol in current_prices:
-                current_price = float(current_prices[symbol]['price']) if current_prices[symbol]['price'] is not None else 0.0
+            asset = asset_lookup.get(asset_id)
+            if not asset:
+                continue
+            symbol = asset.symbol
+            if quantity > 0:
+                price_record = current_prices.get(symbol)
+                raw_price = price_record.get('price') if price_record else None
+                if raw_price is not None:
+                    current_price = float(raw_price)
+                else:
+                    current_price = float(asset.current_price or 0.0)
                 quantity = float(quantity) if quantity is not None else 0.0
                 market_value = quantity * current_price
                 
@@ -354,7 +481,7 @@ def get_performance():
                     total_portfolio_value += market_value
                 
                 # Calculate unrealized P&L using position_info
-                symbol_position = position_info.get(symbol, {})
+                symbol_position = position_info.get(asset_id, {})
                 total_cost = float(symbol_position.get('total_cost', 0)) if symbol_position.get('total_cost') is not None else 0.0
                 total_quantity = float(symbol_position.get('total_quantity', 0)) if symbol_position.get('total_quantity') is not None else 0.0
                 
@@ -368,7 +495,7 @@ def get_performance():
                     if not (unrealized_pnl != unrealized_pnl):  # Check for NaN
                         total_unrealized_pnl += unrealized_pnl
         except (ValueError, TypeError, KeyError) as e:
-            logger.warning(f"Error calculating market value for {symbol}: {e}")
+            logger.warning(f"Error calculating market value for asset_id={asset_id}: {e}")
             continue
     
     # Calculate total P&L
@@ -414,8 +541,10 @@ def debug_portfolio():
     portfolio = get_user_portfolio(current_user)
     return jsonify({
         'cash': portfolio.cash,
-        'holdings': portfolio.get_holdings(),
-        'position_info': portfolio.get_position_info()
+        'holdings': portfolio.get_holdings_by_symbol(),
+        'holdings_by_asset_id': portfolio.get_holdings(),
+        'position_info': portfolio.get_position_info_by_symbol(),
+        'position_info_by_asset_id': portfolio.get_position_info()
     })
 
 @app.route('/api/transactions', methods=['GET'])
@@ -435,7 +564,7 @@ def get_transactions():
 def get_assets():
     """Get current asset prices and expiration info for active assets."""
     # Get active assets from database (only those not yet expired)
-    now = datetime.utcnow()
+    now = current_utc()
     active_assets = Asset.query.filter_by(is_active=True).filter(Asset.expires_at > now).all()
     
     # Get current prices from price service
@@ -501,19 +630,19 @@ def get_open_interest():
     """Calculate total open interest for each asset by summing all users' holdings."""
     # Get active assets
     active_assets = Asset.query.filter_by(is_active=True).all()
-    
-    # Initialize open interest for all active assets
-    open_interest = {asset.symbol: 0 for asset in active_assets}
+    id_to_symbol = {asset.id: asset.symbol for asset in active_assets}
+    open_interest = {asset_id: 0 for asset_id in id_to_symbol.keys()}
     
     # Sum holdings across all users
     portfolios = Portfolio.query.all()
     for portfolio in portfolios:
         holdings = portfolio.get_holdings()
-        for symbol, quantity in holdings.items():
-            if symbol in open_interest:
-                open_interest[symbol] += quantity
-    
-    return jsonify(open_interest)
+        for asset_id, quantity in holdings.items():
+            if asset_id in open_interest:
+                open_interest[asset_id] += quantity
+
+    open_interest_by_symbol = {id_to_symbol[asset_id]: quantity for asset_id, quantity in open_interest.items() if id_to_symbol.get(asset_id)}
+    return jsonify(open_interest_by_symbol)
 
 @socketio.on('trade')
 def handle_trade(data):
@@ -551,21 +680,22 @@ def handle_trade(data):
         # Get current holdings and position info
         holdings = portfolio.get_holdings()
         position_info = portfolio.get_position_info()
+        asset_id = asset.id
         
-        # Ensure data exists for this symbol
-        if symbol not in holdings:
-            holdings[symbol] = 0
-        if symbol not in position_info:
-            position_info[symbol] = {'total_cost': 0, 'total_quantity': 0}
+        # Ensure data exists for this asset
+        if asset_id not in holdings:
+            holdings[asset_id] = 0.0
+        if asset_id not in position_info:
+            position_info[asset_id] = {'total_cost': 0.0, 'total_quantity': 0.0}
 
         if trade_type == 'buy':
             if portfolio.cash >= cost:
                 portfolio.cash -= cost
-                holdings[symbol] += quantity
+                holdings[asset_id] += quantity
                 
                 # Update position info for VWAP calculation
-                position_info[symbol]['total_cost'] += cost
-                position_info[symbol]['total_quantity'] += quantity
+                position_info[asset_id]['total_cost'] += cost
+                position_info[asset_id]['total_quantity'] += quantity
                 
                 # Update portfolio in database
                 portfolio.set_holdings(holdings)
@@ -574,8 +704,9 @@ def handle_trade(data):
                 # Record transaction in database
                 transaction = Transaction(
                     user_id=current_user.id,
+                    asset_id=asset.id,
+                    legacy_symbol=asset.symbol,
                     timestamp=timestamp,
-                    symbol=symbol,
                     type='buy',
                     quantity=quantity,
                     price=price,
@@ -589,6 +720,7 @@ def handle_trade(data):
                     'timestamp': timestamp,
                     'symbol': symbol,
                     'type': 'buy',
+                    'asset_id': asset.id,
                     'quantity': quantity,
                     'price': price,
                     'total_cost': cost,
@@ -598,18 +730,18 @@ def handle_trade(data):
                 emit('trade_confirmation', {'success': False, 'message': 'Insufficient funds', 'symbol': symbol, 'type': 'buy', 'quantity': quantity})
                 
         elif trade_type == 'sell':
-            if holdings[symbol] >= quantity:
+            if holdings[asset_id] >= quantity:
                 portfolio.cash += cost
-                holdings[symbol] -= quantity
+                holdings[asset_id] -= quantity
                 
                 # Update position info for VWAP calculation
-                if position_info[symbol]['total_quantity'] > 0:
+                if position_info[asset_id]['total_quantity'] > 0:
                     # Calculate proportion of position being sold
-                    proportion_sold = quantity / position_info[symbol]['total_quantity']
-                    cost_basis_sold = position_info[symbol]['total_cost'] * proportion_sold
+                    proportion_sold = quantity / position_info[asset_id]['total_quantity']
+                    cost_basis_sold = position_info[asset_id]['total_cost'] * proportion_sold
                     
-                    position_info[symbol]['total_cost'] -= cost_basis_sold
-                    position_info[symbol]['total_quantity'] -= quantity
+                    position_info[asset_id]['total_cost'] -= cost_basis_sold
+                    position_info[asset_id]['total_quantity'] -= quantity
                 
                 # Update portfolio in database
                 portfolio.set_holdings(holdings)
@@ -618,8 +750,9 @@ def handle_trade(data):
                 # Record transaction in database
                 transaction = Transaction(
                     user_id=current_user.id,
+                    asset_id=asset.id,
+                    legacy_symbol=asset.symbol,
                     timestamp=timestamp,
-                    symbol=symbol,
                     type='sell',
                     quantity=quantity,
                     price=price,
@@ -633,6 +766,7 @@ def handle_trade(data):
                     'timestamp': timestamp,
                     'symbol': symbol,
                     'type': 'sell',
+                    'asset_id': asset.id,
                     'quantity': quantity,
                     'price': price,
                     'total_cost': cost,
@@ -642,11 +776,11 @@ def handle_trade(data):
                 emit('trade_confirmation', {'success': False, 'message': 'Insufficient holdings', 'symbol': symbol, 'type': 'sell', 'quantity': quantity})
         
         # Emit portfolio update to the user
-        socketio.emit('portfolio_update', {
+        emit('portfolio_update', {
             'cash': portfolio.cash,
-            'holdings': portfolio.get_holdings(),
-            'position_info': portfolio.get_position_info()
-        }, room=request.sid)
+            'holdings': portfolio.get_holdings_by_symbol(),
+            'position_info': portfolio.get_position_info_by_symbol()
+        })
         
     except Exception as e:
         import traceback
@@ -660,7 +794,7 @@ def update_prices():
         with app.app_context():
             # Get active assets and sync with price service
             # Double-check they're actually active and not expired
-            now = datetime.utcnow()
+            now = current_utc()
             active_assets = Asset.query.filter_by(is_active=True).filter(Asset.expires_at > now).all()
             
             # Sync price service with active assets from database
@@ -734,10 +868,10 @@ def expiration_check_thread():
                     socketio.emit('assets_updated', {
                         'message': f"{stats['expired_assets']} assets expired and settled",
                         'stats': stats
-                    }, broadcast=True)
+                    })
                     
                     # Signal all clients to refresh their portfolio data
-                    socketio.emit('portfolio_refresh_needed', broadcast=True)
+                    socketio.emit('portfolio_refresh_needed', {})
                     
                     logger.info("Emitted settlement notifications to all clients")
                 

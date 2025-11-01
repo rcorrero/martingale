@@ -250,21 +250,26 @@ class FallbackPriceService:
 class HybridPriceService:
     """Hybrid service that uses API when available, falls back to local generation."""
     
-    def __init__(self, assets_config: Dict[str, Dict[str, Any]], api_url: str = "http://localhost:5001"):
+    def __init__(self, assets_config: Dict[str, Dict[str, Any]], api_url: Optional[str] = "http://localhost:5001"):
         """Initialize hybrid service.
         
         Args:
             assets_config: Asset configuration for fallback
-            api_url: URL of the price service API
+            api_url: URL of the price service API (None to disable API usage)
         """
-        self.client = PriceServiceClient(api_url)
         self.fallback = FallbackPriceService(assets_config)
+        self.client: Optional[PriceServiceClient] = PriceServiceClient(api_url) if api_url else None
+        self._api_enabled = bool(self.client)
         self._api_available = False
         self._last_health_check = 0
         self._health_check_interval = 30  # seconds
     
     def _check_api_health(self) -> bool:
         """Check if API is available (with caching to avoid frequent checks)."""
+        if not self._api_enabled or not self.client:
+            self._api_available = False
+            return False
+
         current_time = time.time()
         if current_time - self._last_health_check > self._health_check_interval:
             self._api_available = self.client.health_check()
@@ -273,7 +278,7 @@ class HybridPriceService:
     
     def get_current_prices(self) -> Dict[str, Dict[str, Any]]:
         """Get current prices, preferring API over fallback."""
-        if self._check_api_health():
+        if self._check_api_health() and self.client:
             prices = self.client.get_current_prices()
             if prices:
                 return prices
@@ -295,7 +300,7 @@ class HybridPriceService:
     
     def get_price_history(self, symbol: Optional[str] = None, limit: Optional[int] = None) -> Dict[str, List[Dict]]:
         """Get price history, preferring API over fallback."""
-        if self._check_api_health():
+        if self._check_api_health() and self.client:
             history = self.client.get_price_history(symbol, limit)
             if history:
                 return history
@@ -305,7 +310,7 @@ class HybridPriceService:
     
     def is_using_api(self) -> bool:
         """Check if currently using API (vs fallback)."""
-        return self._api_available
+        return self._api_enabled and self._api_available
     
     def sync_assets_from_db(self, active_assets):
         """Sync fallback price service with active assets from database.

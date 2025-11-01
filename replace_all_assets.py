@@ -12,8 +12,7 @@ import os
 os.environ.setdefault('FLASK_ENV', 'development')
 
 from app import create_app
-from models import db, Asset, Portfolio
-from datetime import datetime
+from models import db, Asset, Portfolio, current_utc
 
 def replace_all_assets():
     """Replace all existing assets with new ones."""
@@ -37,21 +36,21 @@ def replace_all_assets():
                     portfolios = Portfolio.query.all()
                     for portfolio in portfolios:
                         holdings = portfolio.get_holdings()
-                        if asset.symbol in holdings and holdings[asset.symbol] > 0:
-                            quantity = holdings[asset.symbol]
+                        if asset.id in holdings and holdings[asset.id] > 0:
+                            quantity = holdings[asset.id]
                             value = quantity * asset.current_price
                             
                             # Return cash
                             portfolio.cash += value
                             
                             # Remove holding
-                            del holdings[asset.symbol]
+                            del holdings[asset.id]
                             portfolio.set_holdings(holdings)
                             
                             # Remove position info
                             position_info = portfolio.get_position_info()
-                            if asset.symbol in position_info:
-                                del position_info[asset.symbol]
+                            if asset.id in position_info:
+                                del position_info[asset.id]
                                 portfolio.set_position_info(position_info)
                             
                             print(f"    Settled {quantity} shares for user {portfolio.user_id} at ${asset.current_price:.2f} = ${value:.2f}")
@@ -72,7 +71,7 @@ def replace_all_assets():
                 db.session.add(asset)
                 new_assets.append(asset)
                 
-                time_to_expiry = (asset.expires_at - datetime.utcnow()).total_seconds() / 60
+                time_to_expiry = (asset.expires_at - current_utc()).total_seconds() / 60
                 print(f"  {i+1}. {asset.symbol}: volatility={asset.volatility:.4f}, expires in {time_to_expiry:.1f} minutes, color={asset.color}")
             
             db.session.commit()

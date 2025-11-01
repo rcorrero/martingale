@@ -67,6 +67,7 @@ class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True
     FLASK_ENV = 'development'
+    PRICE_SERVICE_URL = os.environ.get('PRICE_SERVICE_URL')
 
 class ProductionConfig(Config):
     """Production configuration."""
