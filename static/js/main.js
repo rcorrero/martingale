@@ -1810,7 +1810,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const timeToExpiry = assetData.time_to_expiry_seconds || 0;
                     const expiryDisplay = formatTimeToExpiry(timeToExpiry);
                     
-                    const row = `<tr style="border-left: 4px solid ${color};">
+                    const row = `<tr style="box-shadow: inset 3px 0 0 ${color};">
                         <td data-label="Symbol"><span class="symbol-badge" style="background-color: ${color};">${symbol}</span></td>
                         <td data-label="Price" style="color: ${priceColor}; font-weight: 600; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(currentPrice)}</td>
                         <td data-label="Expires In" style="font-family: 'JetBrains Mono', monospace;">${expiryDisplay}</td>
@@ -1858,7 +1858,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const timeToExpiry = assetData.time_to_expiry_seconds || 0;
                     const expiryDisplay = formatTimeToExpiry(timeToExpiry);
                     
-                    const row = `<tr style="border-left: 4px solid ${color};">
+                    const row = `<tr style="box-shadow: inset 3px 0 0 ${color};">
                         <td data-label="Symbol"><span class="symbol-badge" style="background-color: ${color};">${symbol}</span></td>
                         <td data-label="Price" style="color: ${priceColor}; font-weight: 600; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(currentPrice)}</td>
                         <td data-label="Expires In" style="font-family: 'JetBrains Mono', monospace;">${expiryDisplay}</td>
