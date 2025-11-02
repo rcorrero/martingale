@@ -281,16 +281,16 @@ document.addEventListener('DOMContentLoaded', () => {
                                         // Only update if the highlighted symbol changed
                                         if (currentlyHighlightedSymbol !== label) {
                                             currentlyHighlightedSymbol = label;
-                                            clearHoldingsHighlight();
+                                            clearHoldingsHighlight(true);
                                             highlightHoldingsItem(label);
                                         }
                                     } else {
                                         // Only clear if something was highlighted
-                                        if (currentlyHighlightedSymbol !== null) {
-                                            currentlyHighlightedSymbol = null;
-                                            clearHoldingsHighlight();
-                                        }
+                                        clearAllCrossHighlights();
                                     }
+                                },
+                                onLeave: () => {
+                                    clearAllCrossHighlights();
                                 },
                                 elements: {
                                     arc: {
@@ -304,6 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         });
                     } else {
+                        clearAllCrossHighlights();
                         // Update existing chart
                         portfolioPieChart.data.labels = portfolioLabels;
                         portfolioPieChart.data.datasets[0].data = portfolioData;
@@ -314,6 +315,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     // Update holdings list with cross-highlighting capabilities
                     updateHoldingsCrossHighlighting();
+
+                    // Ensure chart hover state clears when pointer leaves canvas (covers rapid exits)
+                    if (!canvas.dataset.hoverExitBound) {
+                        const handleChartHoverExit = () => {
+                            clearAllCrossHighlights();
+                        };
+
+                        canvas.addEventListener('mouseleave', handleChartHoverExit);
+                        canvas.addEventListener('pointerleave', handleChartHoverExit);
+                        canvas.addEventListener('mouseout', handleChartHoverExit);
+                        canvas.addEventListener('touchend', handleChartHoverExit);
+                        canvas.addEventListener('touchcancel', handleChartHoverExit);
+                        canvas.dataset.hoverExitBound = 'true';
+                    }
                 })
                 .catch(error => {
                     // Error fetching assets for pie chart
@@ -356,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function highlightHoldingsItem(symbol) {
-        clearHoldingsHighlight();
+        clearHoldingsHighlight(true);
         const holdingsItems = document.querySelectorAll('#holdings-list li');
         holdingsItems.forEach(item => {
             const itemSymbol = item.dataset.symbol || item.querySelector('.symbol-badge')?.textContent;
@@ -373,17 +388,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function clearHoldingsHighlight() {
+    function clearHoldingsHighlight(force = false) {
         const holdingsItems = document.querySelectorAll('#holdings-list li');
+        const hoveredItem = document.querySelector('#holdings-list li:hover');
+
+        if (!hoveredItem) {
+            activeHoldingSymbol = null;
+        }
+
         holdingsItems.forEach(item => {
-            const itemSymbol = item.dataset.symbol || item.querySelector('.symbol-badge')?.textContent;
-            if (item.matches(':hover') ||
-                (activeHoldingSymbol && itemSymbol === activeHoldingSymbol) ||
-                (currentlyHighlightedSymbol && itemSymbol === currentlyHighlightedSymbol)) {
+            const itemSymbol = (item.dataset.symbol || item.querySelector('.symbol-badge')?.textContent || '').trim();
+            if (!force && (item.matches(':hover') ||
+                (hoveredItem && activeHoldingSymbol && itemSymbol === activeHoldingSymbol) ||
+                (currentlyHighlightedSymbol && itemSymbol === currentlyHighlightedSymbol))) {
                 return;
             }
             resetHoldingHighlight(item);
         });
+
+        if (force && hoveredItem) {
+            applyHoldingHighlight(hoveredItem, false);
+        }
     }
 
     function highlightPieChartSegment(symbol) {
@@ -408,6 +433,11 @@ document.addEventListener('DOMContentLoaded', () => {
         portfolioPieChart.setActiveElements([]);
         portfolioPieChart.update('none');
         currentlyHighlightedSymbol = null;
+    }
+
+    function clearAllCrossHighlights() {
+        clearPieChartHighlight();
+        clearHoldingsHighlight(true);
     }
 
     function updateHoldingsCrossHighlighting() {
@@ -443,15 +473,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 item.style.cursor = 'pointer';
 
                 // If the pointer is already over this item, immediately apply the hover styling
-                if (item.matches(':hover')) {
+                const isHovered = item.matches(':hover');
+
+                if (isHovered) {
                     activeHoldingSymbol = symbol;
                     highlightPieChartSegment(symbol);
                     applyHoldingHighlight(item, false);
-                } else if (activeHoldingSymbol && activeHoldingSymbol === symbol) {
-                    applyHoldingHighlight(item, false);
-                    highlightPieChartSegment(symbol);
                 } else if (currentlyHighlightedSymbol && currentlyHighlightedSymbol === symbol) {
                     applyHoldingHighlight(item, false);
+                } else {
+                    if (activeHoldingSymbol === symbol) {
+                        activeHoldingSymbol = null;
+                    }
+                    resetHoldingHighlight(item);
                 }
             }
         });
