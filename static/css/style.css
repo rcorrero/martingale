@@ -2194,6 +2194,12 @@ body.info-page {
 
 .notification-close:hover { color: #e2e8f0; }
 
+.notification .countdown-timer {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--terminal-danger);
+}
+
 @keyframes slideIn {
     from { transform: translateX(400px); opacity: 0; }
     to { transform: translateX(0); opacity: 1; }

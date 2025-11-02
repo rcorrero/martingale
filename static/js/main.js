@@ -53,6 +53,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let portfolioHistoryData = [];
     let portfolioHistoryRefreshTimer = null;
     let portfolioHistoryRequest = null;
+    let latestAssetsSnapshot = null;
+
+    const EXPIRING_NOTIFICATION_THRESHOLD = 300; // 5 minutes
+    const EXPIRING_COUNTDOWN_THRESHOLD = 60;      // 1 minute
+    const EXPIRING_SNOOZE_MS = 60000;             // 1 minute snooze after manual dismissal
+
+    const expiringAssetNotifications = new Map();
+    const expiringNotificationSnoozed = new Map();
+    const notificationAutoCloseTimers = new Map();
 
     // Function to apply asset search filter
     function applyAssetSearchFilter() {
@@ -342,6 +351,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
                 .catch(error => {
                     // Error fetching assets for pie chart
+                    if (latestAssetsSnapshot) {
+                        evaluateExpiringHoldings(latestAssetsSnapshot);
+                    }
                 });
         }
     };
@@ -902,26 +914,310 @@ document.addEventListener('DOMContentLoaded', () => {
         return `<span style="color: ${color}; font-weight: 600; font-family: 'JetBrains Mono', monospace;">${formatted}</span>`;
     }
 
-    function showNotification(message, type = 'info') {
-        // Show notification banner at top of page
+    function showNotification(message, type = 'info', options = {}) {
+        const container = document.getElementById('notification-container');
+        if (!container) return null;
+
+        const {
+            id = null,
+            autoClose = true,
+            autoCloseMs = 10000,
+            replaceExisting = true,
+            onClose = null
+        } = options;
+
+        let notification = null;
+        if (id) {
+            notification = container.querySelector(`.notification[data-notification-id="${id}"]`);
+        }
+
+        if (!notification) {
+            notification = document.createElement('div');
+            if (id) {
+                notification.dataset.notificationId = id;
+            }
+            notification.className = `notification notification-${type}`;
+
+            const messageSpan = document.createElement('span');
+            messageSpan.className = 'notification-message';
+            messageSpan.innerHTML = message;
+            notification.appendChild(messageSpan);
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'notification-close';
+            closeBtn.textContent = '×';
+            closeBtn.onclick = () => {
+                removeNotification(notification, id);
+                if (typeof onClose === 'function') {
+                    onClose();
+                }
+            };
+            notification.appendChild(closeBtn);
+
+            container.appendChild(notification);
+        } else if (replaceExisting) {
+            notification.className = `notification notification-${type}`;
+
+            let messageSpan = notification.querySelector('.notification-message');
+            if (!messageSpan) {
+                messageSpan = document.createElement('span');
+                messageSpan.className = 'notification-message';
+                notification.prepend(messageSpan);
+            }
+            messageSpan.innerHTML = message;
+
+            let closeBtn = notification.querySelector('.notification-close');
+            if (!closeBtn) {
+                closeBtn = document.createElement('button');
+                closeBtn.className = 'notification-close';
+                notification.appendChild(closeBtn);
+            }
+            closeBtn.textContent = '×';
+            closeBtn.onclick = () => {
+                removeNotification(notification, id);
+                if (typeof onClose === 'function') {
+                    onClose();
+                }
+            };
+        }
+
+        if (id) {
+            notification.dataset.notificationId = id;
+        }
+
+        if (id && notificationAutoCloseTimers.has(id)) {
+            clearTimeout(notificationAutoCloseTimers.get(id));
+            notificationAutoCloseTimers.delete(id);
+        }
+
+        if (autoClose) {
+            const timeout = setTimeout(() => {
+                removeNotification(notification, id);
+                if (typeof onClose === 'function') {
+                    onClose();
+                }
+            }, autoCloseMs);
+
+            if (id) {
+                notificationAutoCloseTimers.set(id, timeout);
+            }
+        }
+
+        return notification;
+    }
+
+    function removeNotification(notification, id = null) {
+        if (id && notificationAutoCloseTimers.has(id)) {
+            clearTimeout(notificationAutoCloseTimers.get(id));
+            notificationAutoCloseTimers.delete(id);
+        }
+
+        if (notification && notification.parentElement) {
+            notification.parentElement.removeChild(notification);
+        }
+    }
+
+    function removeNotificationById(id) {
+        if (!id) return;
         const container = document.getElementById('notification-container');
         if (!container) return;
-        
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        notification.innerHTML = `
-            <span class="notification-message">${message}</span>
-            <button class="notification-close" onclick="this.parentElement.remove()">×</button>
-        `;
-        
-        container.appendChild(notification);
-        
-        // Auto-remove after 10 seconds
-        setTimeout(() => {
-            if (notification.parentElement) {
-                notification.remove();
+        const notification = container.querySelector(`.notification[data-notification-id="${id}"]`);
+        if (notification) {
+            removeNotification(notification, id);
+        }
+    }
+
+    function formatShortDuration(seconds) {
+        const totalSeconds = Math.max(0, Math.floor(seconds));
+        const minutes = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+        if (minutes > 0) {
+            return `${minutes}m ${secs.toString().padStart(2, '0')}s`;
+        }
+        return `${secs}s`;
+    }
+
+    function formatCountdownDisplay(seconds) {
+        const totalSeconds = Math.max(0, Math.ceil(seconds));
+        const minutes = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
+        return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function buildExpiringWarningMessage(symbol, seconds, quantity) {
+        return `<strong>${symbol}</strong> expires soon (${formatShortDuration(seconds)}). Holding ${formatQuantity(quantity)} unit(s).`;
+    }
+
+    function buildExpiringCountdownMessage(symbol, seconds, quantity) {
+        return `<strong>${symbol}</strong> expires in <span class="countdown-timer">${formatCountdownDisplay(seconds)}</span>. Holding ${formatQuantity(quantity)} unit(s).`;
+    }
+
+    function startCountdownForEntry(symbol, entry) {
+        if (entry.timerId) {
+            clearInterval(entry.timerId);
+        }
+
+        const tick = () => {
+            const remaining = Math.ceil((entry.expiryTimestamp - Date.now()) / 1000);
+            if (remaining <= 0) {
+                cleanupExpiringNotification(symbol);
+                return;
             }
-        }, 10000);
+            if (entry.messageEl) {
+                entry.messageEl.innerHTML = buildExpiringCountdownMessage(symbol, remaining, entry.quantity);
+            }
+        };
+
+        tick();
+        entry.timerId = setInterval(tick, 1000);
+    }
+
+    function ensureExpiringNotification(symbol, quantity, secondsToExpiry) {
+        const id = `expiring-${symbol}`;
+        const shouldCountdown = secondsToExpiry <= EXPIRING_COUNTDOWN_THRESHOLD;
+        const message = shouldCountdown
+            ? buildExpiringCountdownMessage(symbol, secondsToExpiry, quantity)
+            : buildExpiringWarningMessage(symbol, secondsToExpiry, quantity);
+
+        let entry = expiringAssetNotifications.get(symbol);
+
+        if (!entry) {
+            const notification = showNotification(message, 'warning', {
+                id,
+                autoClose: false,
+                onClose: () => cleanupExpiringNotification(symbol, { manual: true, skipRemove: true })
+            });
+
+            if (!notification) {
+                return;
+            }
+
+            entry = {
+                notification,
+                messageEl: notification.querySelector('.notification-message'),
+                timerId: null,
+                mode: shouldCountdown ? 'countdown' : 'warning',
+                expiryTimestamp: Date.now() + (secondsToExpiry * 1000),
+                quantity
+            };
+
+            if (entry.notification) {
+                entry.notification.className = 'notification notification-warning';
+            }
+
+            expiringAssetNotifications.set(symbol, entry);
+
+            if (shouldCountdown) {
+                startCountdownForEntry(symbol, entry);
+            }
+
+            return;
+        }
+
+        entry.expiryTimestamp = Date.now() + (secondsToExpiry * 1000);
+        entry.quantity = quantity;
+
+        if (!entry.messageEl || !entry.messageEl.isConnected) {
+            entry.messageEl = entry.notification?.querySelector('.notification-message') || null;
+        }
+
+        if (entry.messageEl) {
+            entry.messageEl.innerHTML = message;
+        } else {
+            const updatedNotification = showNotification(message, 'warning', {
+                id,
+                autoClose: false,
+                replaceExisting: true
+            });
+            entry.notification = updatedNotification;
+            entry.messageEl = updatedNotification?.querySelector('.notification-message') || null;
+        }
+
+        if (entry.notification) {
+            entry.notification.className = 'notification notification-warning';
+        }
+
+        if (shouldCountdown) {
+            if (entry.mode !== 'countdown') {
+                entry.mode = 'countdown';
+                startCountdownForEntry(symbol, entry);
+            }
+        } else {
+            if (entry.timerId) {
+                clearInterval(entry.timerId);
+                entry.timerId = null;
+            }
+            entry.mode = 'warning';
+        }
+    }
+
+    function cleanupExpiringNotification(symbol, options = {}) {
+        const { manual = false, skipRemove = false } = options;
+        const entry = expiringAssetNotifications.get(symbol);
+
+        if (entry && entry.timerId) {
+            clearInterval(entry.timerId);
+        }
+
+        if (!skipRemove) {
+            removeNotificationById(`expiring-${symbol}`);
+        }
+
+        expiringAssetNotifications.delete(symbol);
+
+        if (manual) {
+            expiringNotificationSnoozed.set(symbol, Date.now() + EXPIRING_SNOOZE_MS);
+        } else {
+            expiringNotificationSnoozed.delete(symbol);
+        }
+    }
+
+    function evaluateExpiringHoldings(assets) {
+        if (!assets || !userPortfolio || !userPortfolio.holdings) {
+            return;
+        }
+
+        const activeSymbols = new Set();
+        const now = Date.now();
+
+        Object.entries(userPortfolio.holdings).forEach(([symbol, quantity]) => {
+            if (quantity <= 0) {
+                return;
+            }
+
+            const assetInfo = assets[symbol];
+            if (!assetInfo) {
+                return;
+            }
+
+            const secondsToExpiry = Number(assetInfo.time_to_expiry_seconds);
+            if (!Number.isFinite(secondsToExpiry)) {
+                return;
+            }
+
+            if (secondsToExpiry <= 0) {
+                cleanupExpiringNotification(symbol);
+                return;
+            }
+
+            if (secondsToExpiry <= EXPIRING_NOTIFICATION_THRESHOLD) {
+                const snoozedUntil = expiringNotificationSnoozed.get(symbol);
+                if (snoozedUntil && snoozedUntil > now) {
+                    return;
+                }
+                if (snoozedUntil && snoozedUntil <= now) {
+                    expiringNotificationSnoozed.delete(symbol);
+                }
+                ensureExpiringNotification(symbol, quantity, secondsToExpiry);
+                activeSymbols.add(symbol);
+            }
+        });
+
+        expiringAssetNotifications.forEach((_, symbol) => {
+            if (!activeSymbols.has(symbol)) {
+                cleanupExpiringNotification(symbol);
+            }
+        });
     }
 
     function createTransactionRow(transaction) {
@@ -1772,6 +2068,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function updateAssetsTable(assets) {
+        latestAssetsSnapshot = assets;
+        evaluateExpiringHoldings(assets);
         latestAssetPrices = {};
         // Fetch current open interest data
         fetch('/api/open-interest')
@@ -1829,6 +2127,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Reapply search filter after table update
                 applyAssetSearchFilter();
                 updateBuyingPowerDisplay();
+                evaluateExpiringHoldings(assets);
             })
             .catch(error => {
                 // Error fetching open interest
@@ -1876,6 +2175,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Reapply search filter after table update
                 applyAssetSearchFilter();
                 updateBuyingPowerDisplay();
+                evaluateExpiringHoldings(assets);
             });
     }
 
@@ -1940,6 +2240,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     })
                     .then(assets => {
                         if (!assets) return;
+                        latestAssetsSnapshot = assets;
+                        evaluateExpiringHoldings(assets);
                         
                         holdingsList.innerHTML = '';
                         
@@ -2000,6 +2302,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     })
                     .catch(error => {
                         // Error fetching assets for portfolio
+                        if (latestAssetsSnapshot) {
+                            evaluateExpiringHoldings(latestAssetsSnapshot);
+                        }
                     });
             });
     }
