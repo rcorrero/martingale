@@ -212,7 +212,10 @@ class FallbackPriceService:
                 continue
                 
             change_percent = np.random.normal(0, data['volatility'])
+            # std_dev = np.sqrt(data['volatility'])
+            # change_percent = np.random.lognormal(-data['volatility']/2, std_dev)
             data['price'] *= (1 + change_percent)
+            # data['price'] *= change_percent
             data['price'] = max(data['price'], 0.0)  # Prevent negative prices
             data['last_update'] = timestamp
             

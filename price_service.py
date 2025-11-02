@@ -134,6 +134,10 @@ class PriceService:
             
             # Ensure price doesn't go negative
             data['price'] = max(new_price, 0.01)
+            # std_dev = np.sqrt(data['volatility'])
+            # change_percent = np.random.lognormal(-data['volatility']/2, std_dev)
+            # data['price'] *= change_percent
+            data['price'] = max(data['price'], 0.0)  # Prevent negative prices
             data['last_update'] = timestamp
             
             # Add to history
