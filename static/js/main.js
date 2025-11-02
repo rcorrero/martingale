@@ -98,6 +98,32 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let colorIndex = 0;
 
+    function hexToRgba(hex, alpha = 0.3) {
+        if (typeof hex !== 'string') {
+            return `rgba(59, 130, 246, ${alpha})`;
+        }
+
+        let normalized = hex.trim();
+        if (normalized.startsWith('#')) {
+            normalized = normalized.slice(1);
+        }
+
+        if (normalized.length === 3) {
+            normalized = normalized.split('').map(ch => ch + ch).join('');
+        }
+
+        const intVal = parseInt(normalized, 16);
+        if (Number.isNaN(intVal)) {
+            return `rgba(59, 130, 246, ${alpha})`;
+        }
+
+        const r = (intVal >> 16) & 255;
+        const g = (intVal >> 8) & 255;
+        const b = intVal & 255;
+
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
     function getInstrumentColor(symbol, assetData = null) {
         // If asset data provided with color, use it and cache it
         if (assetData && assetData.color) {
@@ -1785,8 +1811,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     label: symbol,
                     data: validHistory,
                     borderColor: color,
-                    backgroundColor: color + '20', // Add transparency
-                    tension: 0, // No curve - straight lines between points
+                    backgroundColor: hexToRgba(color, 0.18),
+                    fill: 'origin',
+                    tension: 0.25,
+                    borderWidth: 2,
                     pointRadius: 0,
                     pointHoverRadius: 6,
                     pointHoverBackgroundColor: color,
