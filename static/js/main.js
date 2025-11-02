@@ -2465,10 +2465,46 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (data.stats && data.stats.settlement_stats) {
             const settleStats = data.stats.settlement_stats;
-            if (settleStats.positions_settled > 0) {
+            const normalizedCurrentUserId = currentUserId != null ? String(currentUserId) : null;
+            const settlementTransactions = Array.isArray(settleStats.transactions)
+                ? settleStats.transactions
+                : [];
+
+            let userSettlements = [];
+            if (normalizedCurrentUserId) {
+                userSettlements = settlementTransactions.filter(tx => String(tx.user_id) === normalizedCurrentUserId);
+            }
+
+            if (userSettlements.length > 0) {
+                const totalValue = userSettlements.reduce((sum, tx) => {
+                    const raw = Number(tx.total_cost ?? tx.settlement_value ?? 0);
+                    return Number.isFinite(raw) ? sum + raw : sum;
+                }, 0);
+
+                const uniqueSymbols = Array.from(new Set(userSettlements.map(tx => tx.symbol).filter(Boolean)));
+                let symbolsSummary = '';
+                if (uniqueSymbols.length > 0) {
+                    const maxSymbols = 3;
+                    const shownSymbols = uniqueSymbols.slice(0, maxSymbols);
+                    symbolsSummary = shownSymbols.join(', ');
+                    const remaining = uniqueSymbols.length - shownSymbols.length;
+                    if (remaining > 0) {
+                        symbolsSummary += `, +${remaining} more`;
+                    }
+                }
+
+                let message = `${userSettlements.length} position${userSettlements.length === 1 ? '' : 's'} settled for ${formatCurrencyLocale(totalValue)}.`;
+                if (symbolsSummary) {
+                    message += ` (${symbolsSummary})`;
+                }
+
+                showNotification(message, 'success', { id: 'user-settlement-summary' });
+            } else if (settlementTransactions.length === 0 && settleStats.positions_settled > 0) {
+                // Fallback for older payloads without per-user transaction details
                 showNotification(
                     `${settleStats.positions_settled} position(s) settled. Total value: ${formatCurrencyLocale(settleStats.total_value_settled)}`,
-                    'success'
+                    'success',
+                    { id: 'user-settlement-summary' }
                 );
             }
         }
