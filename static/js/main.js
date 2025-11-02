@@ -665,6 +665,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${month}/${day} ${hours}:${minutes}:${seconds}`;
     }
 
+    function formatUserIdentifier(userId) {
+        if (userId === null || userId === undefined || userId === '') {
+            return '--';
+        }
+        return String(userId);
+    }
+
     function updatePortfolioHistoryLatestLabel(latestValue = null) {
         if (!portfolioValueLatestEl) {
             return;
@@ -1246,7 +1253,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function createTransactionRow(transaction) {
+    function createTransactionRow(transaction, options = {}) {
+        const { includeUser = false } = options;
         const color = getInstrumentColor(transaction.symbol);
         const row = document.createElement('tr');
         row.className = `transaction-${transaction.type}`;
@@ -1255,16 +1263,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const typeColor = isSettlement ? '#f85149' : (transaction.type === 'buy' ? '#7dda58' : '#f85149');
         const typeText = isSettlement ? 'SETTLED' : (transaction.type || '').toUpperCase();
 
-        row.innerHTML = `
-            <td data-label="Time" style="color: #94a3b8; font-size: 11px; white-space: nowrap;">${formatCompactDateTime(transaction.timestamp)}</td>
-            <td data-label="Symbol"><span class="symbol-badge" style="background-color: ${color};">${transaction.symbol}</span></td>
-            <td data-label="Type" style="color: ${typeColor}; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
-                ${typeText}
-            </td>
-            <td data-label="Quantity" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">${formatQuantity(transaction.quantity)}</td>
-            <td data-label="Price" style="color: #00d4ff; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(transaction.price)}</td>
-            <td data-label="Total" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatCurrencyLocale(transaction.total_cost)}</td>
-        `;
+        const cells = [
+            `<td data-label="Time" style="color: #94a3b8; font-size: 11px; white-space: nowrap;">${formatCompactDateTime(transaction.timestamp)}</td>`,
+            `<td data-label="Symbol"><span class="symbol-badge" style="background-color: ${color};">${transaction.symbol}</span></td>`,
+            `<td data-label="Type" style="color: ${typeColor}; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">${typeText}</td>`,
+            `<td data-label="Quantity" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">${formatQuantity(transaction.quantity)}</td>`,
+            `<td data-label="Price" style="color: #00d4ff; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(transaction.price)}</td>`,
+            `<td data-label="Total" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatCurrencyLocale(transaction.total_cost)}</td>`
+        ];
+
+        if (includeUser) {
+            cells.splice(2, 0, `<td data-label="User" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">${formatUserIdentifier(transaction.user_id)}</td>`);
+        }
+
+        row.innerHTML = cells.join('');
         return row;
     }
 
@@ -1287,7 +1299,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sortedTransactions = [...globalTransactions];
 
         sortedTransactions.forEach(transaction => {
-            const row = createTransactionRow(transaction);
+            const row = createTransactionRow(transaction, { includeUser: true });
             allTransactionsTableBody.appendChild(row);
         });
     }
@@ -1390,7 +1402,8 @@ document.addEventListener('DOMContentLoaded', () => {
             type: (transaction.type || 'trade').toLowerCase(),
             quantity: Number(transaction.quantity ?? 0),
             price: Number(transaction.price ?? 0),
-            total_cost: Number(transaction.total_cost ?? 0)
+            total_cost: Number(transaction.total_cost ?? 0),
+            user_id: transaction.user_id ?? null
         };
     }
 

@@ -878,7 +878,8 @@ def get_all_transactions():
         'type': t.type,
         'quantity': t.quantity,
         'price': t.price,
-        'total_cost': t.total_cost
+        'total_cost': t.total_cost,
+        'user_id': t.user_id
     } for t in transactions])
 
 @app.route('/api/leaderboard', methods=['GET'])
@@ -1100,7 +1101,8 @@ def handle_trade(data):
                     'type': 'buy',
                     'quantity': quantity,
                     'price': price,
-                    'total_cost': cost
+                    'total_cost': cost,
+                    'user_id': current_user.id
                 })
             else:
                 emit('trade_confirmation', {'success': False, 'message': 'Insufficient funds', 'symbol': symbol, 'type': 'buy', 'quantity': quantity})
@@ -1154,7 +1156,8 @@ def handle_trade(data):
                     'type': 'sell',
                     'quantity': quantity,
                     'price': price,
-                    'total_cost': cost
+                    'total_cost': cost,
+                    'user_id': current_user.id
                 })
             else:
                 emit('trade_confirmation', {'success': False, 'message': 'Insufficient holdings', 'symbol': symbol, 'type': 'sell', 'quantity': quantity})

@@ -320,7 +320,8 @@ class AssetManager:
                         'type': transaction_data.get('type'),
                         'quantity': transaction_data.get('quantity'),
                         'price': transaction_data.get('price'),
-                        'total_cost': transaction_data.get('total_cost')
+                        'total_cost': transaction_data.get('total_cost'),
+                        'user_id': transaction_data.get('user_id')
                     }
                     self.socketio.emit('global_transaction_update', public_transaction)
                     logger.info(f"Broadcasted settlement transaction for {transaction_data['symbol']} user {transaction_data['user_id']}")
