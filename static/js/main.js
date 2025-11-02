@@ -659,14 +659,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const typeText = isSettlement ? 'SETTLED' : transaction.type.toUpperCase();
             
             row.innerHTML = `
-                <td style="color: #94a3b8; font-size: 11px; white-space: nowrap;">${formatCompactDateTime(transaction.timestamp)}</td>
-                <td><span class="symbol-badge" style="background-color: ${color};">${transaction.symbol}</span></td>
-                <td style="color: ${typeColor}; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                <td data-label="Time" style="color: #94a3b8; font-size: 11px; white-space: nowrap;">${formatCompactDateTime(transaction.timestamp)}</td>
+                <td data-label="Symbol"><span class="symbol-badge" style="background-color: ${color};">${transaction.symbol}</span></td>
+                <td data-label="Type" style="color: ${typeColor}; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
                     ${typeText}
                 </td>
-                <td style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">${formatQuantity(transaction.quantity)}</td>
-                <td style="color: #00d4ff; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(transaction.price)}</td>
-                <td style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatCurrencyLocale(transaction.total_cost)}</td>
+                <td data-label="Quantity" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">${formatQuantity(transaction.quantity)}</td>
+                <td data-label="Price" style="color: #00d4ff; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(transaction.price)}</td>
+                <td data-label="Total" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatCurrencyLocale(transaction.total_cost)}</td>
             `;
             transactionsTableBody.appendChild(row);
         });
@@ -1294,10 +1294,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     const expiryDisplay = formatTimeToExpiry(timeToExpiry);
                     
                     const row = `<tr style="border-left: 4px solid ${color};">
-                        <td><span class="symbol-badge" style="background-color: ${color};">${symbol}</span></td>
-                        <td style="color: ${priceColor}; font-weight: 600; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(currentPrice)}</td>
-                        <td style="font-family: 'JetBrains Mono', monospace;">${expiryDisplay}</td>
-                        <td style="color: #94a3b8; font-family: 'JetBrains Mono', monospace;">${formatQuantity(totalOpenInterest)}</td>
+                        <td data-label="Symbol"><span class="symbol-badge" style="background-color: ${color};">${symbol}</span></td>
+                        <td data-label="Price" style="color: ${priceColor}; font-weight: 600; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(currentPrice)}</td>
+                        <td data-label="Expires In" style="font-family: 'JetBrains Mono', monospace;">${expiryDisplay}</td>
+                        <td data-label="Open Interest" style="color: #94a3b8; font-family: 'JetBrains Mono', monospace;">${formatQuantity(totalOpenInterest)}</td>
                     </tr>`;
                     assetsTableBody.innerHTML += row;
                     
@@ -1338,10 +1338,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     const expiryDisplay = formatTimeToExpiry(timeToExpiry);
                     
                     const row = `<tr style="border-left: 4px solid ${color};">
-                        <td><span class="symbol-badge" style="background-color: ${color};">${symbol}</span></td>
-                        <td style="color: ${priceColor}; font-weight: 600; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(currentPrice)}</td>
-                        <td style="font-family: 'JetBrains Mono', monospace;">${expiryDisplay}</td>
-                        <td style="color: #94a3b8; font-family: 'JetBrains Mono', monospace;">${formatQuantity(0)}</td>
+                        <td data-label="Symbol"><span class="symbol-badge" style="background-color: ${color};">${symbol}</span></td>
+                        <td data-label="Price" style="color: ${priceColor}; font-weight: 600; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(currentPrice)}</td>
+                        <td data-label="Expires In" style="font-family: 'JetBrains Mono', monospace;">${expiryDisplay}</td>
+                        <td data-label="Open Interest" style="color: #94a3b8; font-family: 'JetBrains Mono', monospace;">${formatQuantity(0)}</td>
                     </tr>`;
                     assetsTableBody.innerHTML += row;
                     
