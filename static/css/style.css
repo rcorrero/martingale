@@ -1685,11 +1685,9 @@ td {
     }
     
     /* Hide less critical columns on very small screens */
-    #assets-table th:nth-child(3),
-    #assets-table td:nth-child(3),
     #assets-table th:nth-child(4),
     #assets-table td:nth-child(4) {
-        display: none; /* Hide volatility and open interest on mobile */
+        display: none; /* Hide open interest on very small screens */
     }
     
     /* Transaction table - hide total cost on very small screens */
