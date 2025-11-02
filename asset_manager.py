@@ -314,7 +314,15 @@ class AssetManager:
                     self.socketio.emit('transaction_added', transaction_data)
                     logger.info(f"Emitting global_transaction_update: {transaction_data}")
                     # Also broadcast to all clients for Time & Sales
-                    self.socketio.emit('global_transaction_update', transaction_data)
+                    public_transaction = {
+                        'timestamp': int(transaction_data.get('timestamp', time.time() * 1000)),
+                        'symbol': transaction_data.get('symbol'),
+                        'type': transaction_data.get('type'),
+                        'quantity': transaction_data.get('quantity'),
+                        'price': transaction_data.get('price'),
+                        'total_cost': transaction_data.get('total_cost')
+                    }
+                    self.socketio.emit('global_transaction_update', public_transaction)
                     logger.info(f"Broadcasted settlement transaction for {transaction_data['symbol']} user {transaction_data['user_id']}")
             else:
                 if not self.socketio:

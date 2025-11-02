@@ -408,21 +408,28 @@ h2 {
     color: var(--terminal-loss);
 }
 
-#transactions-container {
+#transactions-container,
+#all-transactions-container,
+#leaderboard-container {
     max-height: 300px;
     overflow-y: auto;
+    overflow-x: auto;
     background: var(--terminal-surface);
     border-radius: 10px;
     border: 1px solid var(--terminal-border);
 }
 
-#transactions-table {
+#transactions-table,
+#all-transactions-table,
+#leaderboard-table {
     font-size: 12px;
     width: 100%;
     background: transparent;
 }
 
-#transactions-table th {
+#transactions-table th,
+#all-transactions-table th,
+#leaderboard-table th {
     background: rgba(59, 130, 246, 0.12);
     position: sticky;
     top: 0;
@@ -435,14 +442,21 @@ h2 {
     border-bottom: 1px solid var(--terminal-border-subtle);
 }
 
+#leaderboard-table tbody tr.pnl-positive,
 .transaction-buy {
     background: rgba(16, 185, 129, 0.1);
     border-left: 3px solid var(--terminal-success);
 }
 
+#leaderboard-table tbody tr.pnl-negative,
 .transaction-sell {
     background: rgba(239, 68, 68, 0.1);
     border-left: 3px solid var(--terminal-danger);
+}
+
+#leaderboard-table tbody tr.pnl-neutral {
+    background: rgba(59, 130, 246, 0.08);
+    border-left: 3px solid var(--terminal-border-subtle);
 }
 
 table {
@@ -503,10 +517,7 @@ td {
     border: 1px solid var(--terminal-border);
 }
 
-
-#transactions-container {
-    overflow-x: auto; /* Allow horizontal scroll on mobile */
-}
+#transactions-table th,
 
 #asset-search {
     width: 100%;
@@ -533,7 +544,9 @@ td {
 }
 
 #assets-table,
-#transactions-table {
+#transactions-table,
+#all-transactions-table,
+#leaderboard-table {
     display: block;
     width: 100%;
     min-width: 0;
@@ -544,7 +557,9 @@ td {
 }
 
 #assets-table thead,
-#transactions-table thead {
+#transactions-table thead,
+#all-transactions-table thead,
+#leaderboard-table thead {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -558,7 +573,9 @@ td {
 }
 
 #assets-table tbody,
-#transactions-table tbody {
+#transactions-table tbody,
+#all-transactions-table tbody,
+#leaderboard-table tbody {
     display: grid;
     gap: 16px;
     width: 100%;
@@ -567,7 +584,9 @@ td {
 }
 
 #assets-table tbody tr,
-#transactions-table tbody tr {
+#transactions-table tbody tr,
+#all-transactions-table tbody tr,
+#leaderboard-table tbody tr {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px 18px;
@@ -581,14 +600,18 @@ td {
 }
 
 #assets-table tbody tr:hover,
-#transactions-table tbody tr:hover {
+#transactions-table tbody tr:hover,
+#all-transactions-table tbody tr:hover,
+#leaderboard-table tbody tr:hover {
     border-color: var(--terminal-border-strong);
     box-shadow: 0 18px 36px rgba(15, 23, 42, 0.55);
     transform: translateY(-2px);
 }
 
 #assets-table td,
-#transactions-table td {
+#transactions-table td,
+#all-transactions-table td,
+#leaderboard-table td {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -599,7 +622,9 @@ td {
 }
 
 #assets-table td::before,
-#transactions-table td::before {
+#transactions-table td::before,
+#all-transactions-table td::before,
+#leaderboard-table td::before {
     content: attr(data-label);
     font-size: 0.72em;
     font-weight: 600;
@@ -609,13 +634,15 @@ td {
     opacity: 0.75;
 }
 
-#transactions-table tbody tr.transaction-buy {
+#transactions-table tbody tr.transaction-buy,
+#all-transactions-table tbody tr.transaction-buy {
     background: rgba(16, 185, 129, 0.12);
     border-left: 3px solid var(--terminal-success);
     border-color: rgba(16, 185, 129, 0.35);
 }
 
-#transactions-table tbody tr.transaction-sell {
+#transactions-table tbody tr.transaction-sell,
+#all-transactions-table tbody tr.transaction-sell {
     background: rgba(239, 68, 68, 0.12);
     border-left: 3px solid var(--terminal-danger);
     border-color: rgba(239, 68, 68, 0.35);
@@ -1310,29 +1337,39 @@ td {
 
     /* Assets and transactions card adjustments */
     #assets-table,
-    #transactions-table {
+    #transactions-table,
+    #all-transactions-table,
+    #leaderboard-table {
         font-size: 11px;
     }
 
     #assets-table tbody,
-    #transactions-table tbody {
+    #transactions-table tbody,
+    #all-transactions-table tbody,
+    #leaderboard-table tbody {
         gap: 14px;
     }
 
     #assets-table tbody tr,
-    #transactions-table tbody tr {
+    #transactions-table tbody tr,
+    #all-transactions-table tbody tr,
+    #leaderboard-table tbody tr {
         padding: 16px 14px;
         gap: 8px 14px;
         border-radius: 10px;
     }
 
     #assets-table td,
-    #transactions-table td {
+    #transactions-table td,
+    #all-transactions-table td,
+    #leaderboard-table td {
         font-size: 0.9em;
     }
 
     #assets-table td::before,
-    #transactions-table td::before {
+    #transactions-table td::before,
+    #all-transactions-table td::before,
+    #leaderboard-table td::before {
         font-size: 0.68em;
     }
 
@@ -1400,7 +1437,8 @@ td {
     }
 
     /* Transactions table optimizations */
-    #transactions-container {
+    #transactions-container,
+    #all-transactions-container {
         max-height: 250px;
     }
 
@@ -1495,7 +1533,9 @@ td {
     
     /* Transaction table - hide total cost on very small screens */
     #transactions-table th:last-child,
-    #transactions-table td:last-child {
+    #transactions-table td:last-child,
+    #all-transactions-table th:last-child,
+    #all-transactions-table td:last-child {
         display: none;
     }
     
@@ -1601,7 +1641,9 @@ td {
     }
 
     #assets-container,
-    #transactions-container {
+    #transactions-container,
+    #all-transactions-container,
+    #leaderboard-container {
         max-height: min(360px, 60vh);
         overflow-y: auto;
         overflow-x: hidden;
@@ -1610,24 +1652,32 @@ td {
     }
 
     #assets-table tbody,
-    #transactions-table tbody {
+    #transactions-table tbody,
+    #all-transactions-table tbody,
+    #leaderboard-table tbody {
         gap: 12px;
     }
 
     #assets-table tbody tr,
-    #transactions-table tbody tr {
+    #transactions-table tbody tr,
+    #all-transactions-table tbody tr,
+    #leaderboard-table tbody tr {
         padding: 14px 12px;
         gap: 6px 12px;
         border-radius: 10px;
     }
 
     #assets-table td,
-    #transactions-table td {
+    #transactions-table td,
+    #all-transactions-table td,
+    #leaderboard-table td {
         font-size: 0.88em;
     }
 
     #assets-table td::before,
-    #transactions-table td::before {
+    #transactions-table td::before,
+    #all-transactions-table td::before,
+    #leaderboard-table td::before {
         font-size: 0.66em;
         margin-bottom: 2px;
     }
@@ -1662,7 +1712,9 @@ td {
         gap: 10px;
     }
     
-    #transactions-container {
+    #transactions-container,
+    #all-transactions-container,
+    #leaderboard-container {
         max-height: 200px;
     }
 }

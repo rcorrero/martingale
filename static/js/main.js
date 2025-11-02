@@ -16,6 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const buyingPowerSharesEl = document.getElementById('buying-power-shares');
     const chartsContainer = document.getElementById('charts-container');
     const transactionsTableBody = document.querySelector('#transactions-table tbody');
+    const allTransactionsTableBody = document.querySelector('#all-transactions-table tbody');
+    const leaderboardTableBody = document.querySelector('#leaderboard-table tbody');
     
     // Time display elements
     const utcTimeEl = document.getElementById('utc-time');
@@ -34,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const themeAccentColor = rootStyles.getPropertyValue('--terminal-border-strong').trim() || '#3b82f6';
     const themeGlowColor = rootStyles.getPropertyValue('--terminal-glow').trim() || 'rgba(59, 130, 246, 0.28)';
     let userTransactions = [];
+    let globalTransactions = [];
     let userPortfolio = {};
     let currentUserId = null; // Store current user ID for filtering
     let portfolioPieChart = null;
@@ -43,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeHoldingSymbol = null; // Track the holding currently hovered by the user
     let latestAssetPrices = {}; // Cache latest prices for buying power calculations
     let availableCashAmount = 0; // Track current available cash
+    const GLOBAL_TRANSACTIONS_LIMIT = 100;
 
     // Function to apply asset search filter
     function applyAssetSearchFilter() {
@@ -675,35 +679,179 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 10000);
     }
 
+    function createTransactionRow(transaction) {
+        const color = getInstrumentColor(transaction.symbol);
+        const row = document.createElement('tr');
+        row.className = `transaction-${transaction.type}`;
+
+        const isSettlement = transaction.type === 'settlement';
+        const typeColor = isSettlement ? '#f85149' : (transaction.type === 'buy' ? '#7dda58' : '#f85149');
+        const typeText = isSettlement ? 'SETTLED' : (transaction.type || '').toUpperCase();
+
+        row.innerHTML = `
+            <td data-label="Time" style="color: #94a3b8; font-size: 11px; white-space: nowrap;">${formatCompactDateTime(transaction.timestamp)}</td>
+            <td data-label="Symbol"><span class="symbol-badge" style="background-color: ${color};">${transaction.symbol}</span></td>
+            <td data-label="Type" style="color: ${typeColor}; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                ${typeText}
+            </td>
+            <td data-label="Quantity" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">${formatQuantity(transaction.quantity)}</td>
+            <td data-label="Price" style="color: #00d4ff; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(transaction.price)}</td>
+            <td data-label="Total" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatCurrencyLocale(transaction.total_cost)}</td>
+        `;
+        return row;
+    }
+
     function updateTransactionsTable() {
         if (!transactionsTableBody) return;
-        
+
         transactionsTableBody.innerHTML = '';
-        // Show most recent transactions first
         const sortedTransactions = [...userTransactions].reverse();
-        
+
         sortedTransactions.forEach(transaction => {
-            const color = getInstrumentColor(transaction.symbol);
-            const row = document.createElement('tr');
-            row.className = `transaction-${transaction.type}`;
-            
-            // Special styling for settlement transactions - use sell color
-            const isSettlement = transaction.type === 'settlement';
-            const typeColor = isSettlement ? '#f85149' : (transaction.type === 'buy' ? '#7dda58' : '#f85149');
-            const typeText = isSettlement ? 'SETTLED' : transaction.type.toUpperCase();
-            
-            row.innerHTML = `
-                <td data-label="Time" style="color: #94a3b8; font-size: 11px; white-space: nowrap;">${formatCompactDateTime(transaction.timestamp)}</td>
-                <td data-label="Symbol"><span class="symbol-badge" style="background-color: ${color};">${transaction.symbol}</span></td>
-                <td data-label="Type" style="color: ${typeColor}; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
-                    ${typeText}
-                </td>
-                <td data-label="Quantity" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">${formatQuantity(transaction.quantity)}</td>
-                <td data-label="Price" style="color: #00d4ff; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(transaction.price)}</td>
-                <td data-label="Total" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatCurrencyLocale(transaction.total_cost)}</td>
-            `;
+            const row = createTransactionRow(transaction);
             transactionsTableBody.appendChild(row);
         });
+    }
+
+    function updateAllTransactionsTable() {
+        if (!allTransactionsTableBody) return;
+
+        allTransactionsTableBody.innerHTML = '';
+        const sortedTransactions = [...globalTransactions];
+
+        sortedTransactions.forEach(transaction => {
+            const row = createTransactionRow(transaction);
+            allTransactionsTableBody.appendChild(row);
+        });
+    }
+
+    const LEADERBOARD_LIMIT = 50;
+    let leaderboardEntries = [];
+    let leaderboardRefreshTimer = null;
+
+    function createLeaderboardRow(entry, index) {
+        const totalPnl = Number(entry.total_pnl ?? 0);
+        const row = document.createElement('tr');
+
+        let stateClass = 'pnl-neutral';
+        if (totalPnl > 0) {
+            stateClass = 'pnl-positive';
+        } else if (totalPnl < 0) {
+            stateClass = 'pnl-negative';
+        }
+        row.classList.add(stateClass);
+
+        const pnlColor = totalPnl > 0 ? '#7dda58' : totalPnl < 0 ? '#f85149' : '#94a3b8';
+        const rankLabel = `#${index + 1}`;
+
+        row.innerHTML = `
+            <td data-label="Rank" style="color: #94a3b8; font-size: 11px; font-family: 'JetBrains Mono', monospace;">${rankLabel}</td>
+            <td data-label="User ID" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">${entry.user_id}</td>
+            <td data-label="Total P&L" style="color: ${pnlColor}; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatCurrencyLocale(totalPnl)}</td>
+        `;
+
+        return row;
+    }
+
+    function updateLeaderboardTable() {
+        if (!leaderboardTableBody) return;
+
+        leaderboardTableBody.innerHTML = '';
+        leaderboardEntries.forEach((entry, index) => {
+            const row = createLeaderboardRow(entry, index);
+            leaderboardTableBody.appendChild(row);
+        });
+    }
+
+    function refreshLeaderboard(limit = LEADERBOARD_LIMIT) {
+        if (!leaderboardTableBody) {
+            return Promise.resolve();
+        }
+
+        return fetch(`/api/leaderboard?limit=${limit}`)
+            .then(response => {
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return null;
+                }
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data) {
+                    return;
+                }
+
+                leaderboardEntries = Array.isArray(data)
+                    ? data.map(entry => ({
+                        user_id: entry.user_id,
+                        total_pnl: Number(entry.total_pnl ?? 0)
+                    }))
+                    : [];
+
+                updateLeaderboardTable();
+            })
+            .catch(error => {
+                console.error('Error refreshing leaderboard:', error);
+            });
+    }
+
+    function scheduleLeaderboardRefresh(delay = 2000) {
+        if (!leaderboardTableBody) return;
+        if (leaderboardRefreshTimer) return;
+
+        leaderboardRefreshTimer = setTimeout(() => {
+            leaderboardRefreshTimer = null;
+            refreshLeaderboard();
+        }, delay);
+    }
+
+    function normalizeTransaction(transaction) {
+        if (!transaction) {
+            return null;
+        }
+
+        const timestamp = typeof transaction.timestamp === 'number'
+            ? transaction.timestamp
+            : parseInt(transaction.timestamp, 10);
+
+        return {
+            timestamp: Number.isFinite(timestamp) ? timestamp : Date.now(),
+            symbol: transaction.symbol || 'UNKNOWN',
+            type: (transaction.type || 'trade').toLowerCase(),
+            quantity: Number(transaction.quantity ?? 0),
+            price: Number(transaction.price ?? 0),
+            total_cost: Number(transaction.total_cost ?? 0)
+        };
+    }
+
+    function refreshGlobalTransactions(limit = GLOBAL_TRANSACTIONS_LIMIT) {
+        return fetch(`/api/transactions/all?limit=${limit}`)
+            .then(response => {
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return null;
+                }
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data) {
+                    return;
+                }
+                globalTransactions = data
+                    .map(normalizeTransaction)
+                    .filter(Boolean);
+                updateAllTransactionsTable();
+                scheduleLeaderboardRefresh(1000);
+            })
+            .catch(() => {
+                // Swallow errors to avoid user-facing disruptions
+            });
     }
 
     function updatePerformance() {
@@ -1272,6 +1420,8 @@ document.addEventListener('DOMContentLoaded', () => {
         updateTransactionsTable();
         updatePortfolio();
         updatePerformance();
+        refreshGlobalTransactions();
+        refreshLeaderboard();
         
         // Update VWAP lines for all charts after portfolio is loaded
         Object.keys(charts).forEach(symbol => {
@@ -1530,6 +1680,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(assets => {
                 updateAssetsTable(assets);
             });
+        scheduleLeaderboardRefresh(1500);
     });
 
     // Handle new transactions
@@ -1542,11 +1693,40 @@ document.addEventListener('DOMContentLoaded', () => {
             // Update VWAP line for this specific instrument
             updateVWAPLine(transaction.symbol);
         }
+        scheduleLeaderboardRefresh(1000);
+    });
+
+    socket.on('global_transaction_update', (transaction) => {
+        const normalized = normalizeTransaction(transaction);
+        if (!normalized) {
+            return;
+        }
+
+        const existingIndex = globalTransactions.findIndex(item =>
+            item.timestamp === normalized.timestamp &&
+            item.symbol === normalized.symbol &&
+            item.type === normalized.type &&
+            item.total_cost === normalized.total_cost
+        );
+
+        if (existingIndex >= 0) {
+            globalTransactions[existingIndex] = normalized;
+        } else {
+            globalTransactions = [normalized, ...globalTransactions];
+        }
+
+        if (globalTransactions.length > GLOBAL_TRANSACTIONS_LIMIT) {
+            globalTransactions.length = GLOBAL_TRANSACTIONS_LIMIT;
+        }
+
+        updateAllTransactionsTable();
+        scheduleLeaderboardRefresh(1000);
     });
 
     // Handle real-time performance updates
     socket.on('performance_update', () => {
         updatePerformance();
+        scheduleLeaderboardRefresh(2000);
     });
 
     // Handle asset expiration and settlement events
@@ -1576,6 +1756,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(error => {
                 // Error fetching assets
             });
+        scheduleLeaderboardRefresh(2000);
     });
 
     // Handle portfolio refresh signal
@@ -1583,6 +1764,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePortfolio();
         updatePerformance();
         createOrUpdatePortfoliePieChart();
+        scheduleLeaderboardRefresh(1500);
     });
 
     // Auto-populate quantity based on asset selection and position
@@ -1822,4 +2004,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Set up symbol badge click handlers
     addSymbolBadgeClickHandlers();
+
+    // Initial leaderboard load
+    refreshLeaderboard();
 });

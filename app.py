@@ -421,99 +421,123 @@ def get_portfolio():
         } for t in portfolio.user.transactions]
     })
 
-@app.route('/api/performance', methods=['GET'])
-@login_required
-def get_performance():
-    portfolio = get_user_portfolio(current_user)
-    
-    # Calculate portfolio value and performance
-    # Ensure cash is a valid number
-    portfolio_cash = portfolio.cash if portfolio.cash is not None else 0.0
-    total_portfolio_value = float(portfolio_cash)
+def calculate_portfolio_performance(portfolio, current_prices=None, active_assets=None, log_details=False):
+    """Calculate performance metrics for a portfolio."""
+    if portfolio is None:
+        return {
+            'portfolio_value': 0.0,
+            'realized_pnl': 0.0,
+            'unrealized_pnl': 0.0,
+            'total_pnl': 0.0,
+            'total_return': 0.0
+        }
+
+    # Starting values
+    portfolio_cash = float(portfolio.cash or 0.0)
+    total_portfolio_value = portfolio_cash
     total_unrealized_pnl = 0.0
-    
-    logger.info(f"Starting portfolio calculation - cash: {portfolio_cash}")
-    
-    # Get current prices from price service (only active assets)
-    try:
-        current_prices = price_service.get_current_prices()
-        # Filter to only active assets
-        active_assets = Asset.query.filter_by(is_active=True).all()
-        active_symbols = {a.symbol for a in active_assets}
-        current_prices = {s: p for s, p in current_prices.items() if s in active_symbols}
+
+    # Load active assets if not provided
+    if active_assets is None:
+        try:
+            active_assets = Asset.query.filter_by(is_active=True).all()
+        except Exception as exc:
+            logger.error(f"Error loading active assets: {exc}")
+            active_assets = []
+
+    active_symbols = {asset.symbol for asset in active_assets if asset.symbol}
+
+    # Load current prices if not provided
+    if current_prices is None:
+        try:
+            current_prices = price_service.get_current_prices()
+        except Exception as exc:
+            if log_details:
+                logger.error(f"Error getting current prices: {exc}")
+            else:
+                logger.debug(f"Error getting current prices: {exc}")
+            current_prices = {}
+
+    current_prices = current_prices or {}
+
+    if active_symbols:
+        current_prices = {
+            symbol: data for symbol, data in current_prices.items()
+            if symbol in active_symbols
+        }
+
+    if log_details:
+        logger.info(f"Starting portfolio calculation - cash: {portfolio_cash}")
         logger.info(f"Current prices for performance calculation: {current_prices}")
-    except Exception as e:
-        logger.error(f"Error getting current prices: {e}")
-        current_prices = {}
-    
+    else:
+        logger.debug(f"Calculating portfolio performance for user_id={portfolio.user_id}")
+
     holdings = portfolio.get_holdings()
     position_info = portfolio.get_position_info()
-    logger.info(f"Holdings: {holdings}, Position info: {position_info}")
+
+    if log_details:
+        logger.info(f"Holdings: {holdings}, Position info: {position_info}")
 
     asset_lookup = {}
     if holdings:
-        assets = Asset.query.filter(Asset.id.in_(holdings.keys())).all()
+        asset_ids = list(holdings.keys())
+        assets = Asset.query.filter(Asset.id.in_(asset_ids)).all()
         asset_lookup = {asset.id: asset for asset in assets}
-    
-    # Validate that total_portfolio_value is not NaN before proceeding
-    if total_portfolio_value != total_portfolio_value:  # Check for NaN
+
+    # Guard against NaN portfolio values before processing
+    if total_portfolio_value != total_portfolio_value:
         logger.error(f"Portfolio cash is NaN: {portfolio_cash}")
-        total_portfolio_value = 100000.0  # Default to initial cash
-    
-    # Calculate current market value of holdings and unrealized P&L (only for active assets)
-    for asset_id, quantity in holdings.items():
+        total_portfolio_value = float(app.config.get('INITIAL_CASH', 100000.0))
+
+    # Calculate market value and unrealized P&L
+    for asset_id, quantity in (holdings or {}).items():
         try:
             asset = asset_lookup.get(asset_id)
             if not asset:
                 continue
+
             symbol = asset.symbol
             if quantity > 0:
                 price_record = current_prices.get(symbol)
-                raw_price = price_record.get('price') if price_record else None
+                raw_price = price_record.get('price') if isinstance(price_record, dict) else None
                 if raw_price is not None:
                     current_price = float(raw_price)
                 else:
                     current_price = float(asset.current_price or 0.0)
+
                 quantity = float(quantity) if quantity is not None else 0.0
                 market_value = quantity * current_price
-                
-                if not (market_value != market_value):  # Check for NaN
+
+                if market_value == market_value:  # Ignore NaN results
                     total_portfolio_value += market_value
-                
-                # Calculate unrealized P&L using position_info
-                symbol_position = position_info.get(asset_id, {})
-                total_cost = float(symbol_position.get('total_cost', 0)) if symbol_position.get('total_cost') is not None else 0.0
-                total_quantity = float(symbol_position.get('total_quantity', 0)) if symbol_position.get('total_quantity') is not None else 0.0
-                
-                # Calculate cost basis for current holdings only
-                # Average cost per share = total_cost / total_quantity
-                # Cost basis for current position = quantity × average_cost_per_share
+
+                symbol_position = position_info.get(asset_id, {}) if position_info else {}
+                total_cost = symbol_position.get('total_cost') if symbol_position else 0.0
+                total_quantity = symbol_position.get('total_quantity') if symbol_position else 0.0
+
+                total_cost = float(total_cost) if total_cost is not None else 0.0
+                total_quantity = float(total_quantity) if total_quantity is not None else 0.0
+
                 if total_quantity > 0 and quantity > 0:
                     average_cost_per_share = total_cost / total_quantity
                     cost_basis_current = quantity * average_cost_per_share
                     unrealized_pnl = market_value - cost_basis_current
-                    if not (unrealized_pnl != unrealized_pnl):  # Check for NaN
+                    if unrealized_pnl == unrealized_pnl:  # Ignore NaN
                         total_unrealized_pnl += unrealized_pnl
-        except (ValueError, TypeError, KeyError) as e:
-            logger.warning(f"Error calculating market value for asset_id={asset_id}: {e}")
+        except (ValueError, TypeError, KeyError) as exc:
+            logger.warning(f"Error calculating market value for asset_id={asset_id}: {exc}")
             continue
-    
-    # Calculate total P&L
-    # Total P&L = (current portfolio value) - initial value
-    # This includes both realized (from closed positions) and unrealized (from open positions)
+
     initial_value = float(app.config.get('INITIAL_CASH', 100000.0))
     total_pnl = total_portfolio_value - initial_value
-    
-    # Realized P&L = Total P&L - Unrealized P&L
-    # This represents gains/losses from positions that have been closed
     realized_pnl = total_pnl - total_unrealized_pnl
-    
-    # Calculate total return percentage
+
     if initial_value > 0:
         total_return_percent = ((total_portfolio_value - initial_value) / initial_value) * 100
     else:
         total_return_percent = 0.0
-    # Final validation - ensure no NaN values are returned
+
+    # Sanitize NaN values
     if total_portfolio_value != total_portfolio_value:
         total_portfolio_value = float(app.config.get('INITIAL_CASH', 100000.0))
     if total_pnl != total_pnl:
@@ -524,15 +548,32 @@ def get_performance():
         realized_pnl = 0.0
     if total_unrealized_pnl != total_unrealized_pnl:
         total_unrealized_pnl = 0.0
-    
-    logger.info(f"Final portfolio values - Value: {total_portfolio_value}, P&L: {total_pnl}, Return: {total_return_percent}%")
-    
+
+    if log_details:
+        logger.info(
+            f"Final portfolio values - Value: {total_portfolio_value}, P&L: {total_pnl}, Return: {total_return_percent}%"
+        )
+
+    return {
+        'portfolio_value': total_portfolio_value,
+        'realized_pnl': realized_pnl,
+        'unrealized_pnl': total_unrealized_pnl,
+        'total_pnl': total_pnl,
+        'total_return': total_return_percent
+    }
+
+@app.route('/api/performance', methods=['GET'])
+@login_required
+def get_performance():
+    portfolio = get_user_portfolio(current_user)
+    performance = calculate_portfolio_performance(portfolio, log_details=True)
+
     return jsonify({
-        'portfolio_value': round(total_portfolio_value, 2),
-        'realized_pnl': round(realized_pnl, 2),
-        'unrealized_pnl': round(total_unrealized_pnl, 2),
-        'total_pnl': round(total_pnl, 2),
-        'total_return': round(total_return_percent, 2)
+        'portfolio_value': round(performance['portfolio_value'], 2),
+        'realized_pnl': round(performance['realized_pnl'], 2),
+        'unrealized_pnl': round(performance['unrealized_pnl'], 2),
+        'total_pnl': round(performance['total_pnl'], 2),
+        'total_return': round(performance['total_return'], 2)
     })
 
 @app.route('/api/debug/portfolio', methods=['GET'])
@@ -559,6 +600,74 @@ def get_transactions():
         'total_cost': t.total_cost
     } for t in current_user.transactions]
     return jsonify(transactions)
+
+@app.route('/api/transactions/all', methods=['GET'])
+@login_required
+def get_all_transactions():
+    """Return anonymized transactions across all accounts."""
+    limit = request.args.get('limit', 100, type=int) or 100
+    limit = max(1, min(limit, 200))
+
+    transactions = (Transaction.query
+                    .order_by(Transaction.timestamp.desc())
+                    .limit(limit)
+                    .all())
+
+    return jsonify([{
+        'timestamp': int(t.timestamp),
+        'symbol': t.symbol,
+        'type': t.type,
+        'quantity': t.quantity,
+        'price': t.price,
+        'total_cost': t.total_cost
+    } for t in transactions])
+
+@app.route('/api/leaderboard', methods=['GET'])
+@login_required
+def get_leaderboard():
+    """Return users ranked by total profit & loss."""
+    limit = request.args.get('limit', 25, type=int) or 25
+    limit = max(1, min(limit, 100))
+
+    try:
+        raw_prices = price_service.get_current_prices()
+    except Exception as exc:
+        logger.error(f"Error getting current prices for leaderboard: {exc}")
+        raw_prices = {}
+
+    active_assets = Asset.query.filter_by(is_active=True).all()
+    active_symbols = {asset.symbol for asset in active_assets if asset.symbol}
+    filtered_prices = {
+        symbol: data for symbol, data in (raw_prices or {}).items()
+        if symbol in active_symbols
+    }
+
+    portfolios = Portfolio.query.all()
+    leaderboard = []
+
+    for portfolio in portfolios:
+        performance = calculate_portfolio_performance(
+            portfolio,
+            current_prices=filtered_prices,
+            active_assets=active_assets,
+            log_details=False
+        )
+        leaderboard.append({
+            'user_id': portfolio.user_id,
+            'total_pnl': performance['total_pnl']
+        })
+
+    leaderboard.sort(key=lambda entry: entry['total_pnl'], reverse=True)
+
+    results = [
+        {
+            'user_id': entry['user_id'],
+            'total_pnl': round(entry['total_pnl'], 2)
+        }
+        for entry in leaderboard[:limit]
+    ]
+
+    return jsonify(results)
 
 @app.route('/api/assets', methods=['GET'])
 def get_assets():
@@ -726,6 +835,14 @@ def handle_trade(data):
                     'total_cost': cost,
                     'user_id': current_user.id
                 })
+                socketio.emit('global_transaction_update', {
+                    'timestamp': int(timestamp),
+                    'symbol': symbol,
+                    'type': 'buy',
+                    'quantity': quantity,
+                    'price': price,
+                    'total_cost': cost
+                })
             else:
                 emit('trade_confirmation', {'success': False, 'message': 'Insufficient funds', 'symbol': symbol, 'type': 'buy', 'quantity': quantity})
                 
@@ -771,6 +888,14 @@ def handle_trade(data):
                     'price': price,
                     'total_cost': cost,
                     'user_id': current_user.id
+                })
+                socketio.emit('global_transaction_update', {
+                    'timestamp': int(timestamp),
+                    'symbol': symbol,
+                    'type': 'sell',
+                    'quantity': quantity,
+                    'price': price,
+                    'total_cost': cost
                 })
             else:
                 emit('trade_confirmation', {'success': False, 'message': 'Insufficient holdings', 'symbol': symbol, 'type': 'sell', 'quantity': quantity})
