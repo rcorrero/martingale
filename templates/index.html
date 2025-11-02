@@ -34,7 +34,7 @@
             </div>
             <div class="user-info">
                 <span class="user-name">{{ current_user.username }}</span>
-                <span class="user-id">ID {{ current_user.id }}</span>
+                <span class="user-id">USER ID: {{ current_user.id }}</span>
                 <a href="{{ url_for('about') }}" class="about-btn">About</a>
                 <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
             </div>
