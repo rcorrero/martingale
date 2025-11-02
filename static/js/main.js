@@ -1257,11 +1257,27 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
+        const priceHeader = document.createElement('div');
+        priceHeader.className = 'portfolio-value-header chart-price-header';
+
+        const priceTitle = document.createElement('h3');
+        priceTitle.className = 'chart-price-title';
+        priceTitle.textContent = 'Last Prices';
+
+        const priceDisplay = document.createElement('div');
+        priceDisplay.className = 'portfolio-value-latest chart-price-latest';
+        priceDisplay.id = `chart-price-display-${index}`;
+        priceDisplay.textContent = '--';
+        priceDisplay.classList.add('chart-price-latest-empty');
+
         // Canvas for the chart
         const canvas = document.createElement('canvas');
         canvas.id = `chart-canvas-${index}`;
 
         chartContainer.appendChild(controlsDiv);
+        priceHeader.appendChild(priceTitle);
+        priceHeader.appendChild(priceDisplay);
+        chartContainer.appendChild(priceHeader);
         chartContainer.appendChild(canvas);
         chartsContainer.appendChild(chartContainer);
 
@@ -1486,7 +1502,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 chartInstance.chart.data.datasets.push(dataset);
                 chartInstance.chart.update('none'); // Update without animation for faster display
-                
+
                 // Force a redraw to ensure proper line rendering
                 setTimeout(() => {
                     chartInstance.chart.update();
@@ -1494,6 +1510,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Update symbols list display
                 updateSymbolsList(chartIndex);
+                updateChartLatestPrices(chartIndex);
             });
     }
 
@@ -1516,6 +1533,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update symbols list display
         updateSymbolsList(chartIndex);
+        updateChartLatestPrices(chartIndex);
     }
 
     function clearChart(chartIndex) {
@@ -1526,6 +1544,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chartInstance.chart.data.datasets = [];
         chartInstance.chart.update();
         updateSymbolsList(chartIndex);
+        updateChartLatestPrices(chartIndex);
     }
 
     function updateSymbolsList(chartIndex) {
@@ -1544,6 +1563,56 @@ document.addEventListener('DOMContentLoaded', () => {
                 </span>
             `;
         }).join('');
+    }
+
+    function updateChartLatestPrices(chartIndex) {
+        const displayEl = document.getElementById(`chart-price-display-${chartIndex}`);
+        const chartInstance = chartInstances[chartIndex];
+
+        if (!displayEl) {
+            return;
+        }
+
+        if (!chartInstance || chartInstance.symbols.length === 0) {
+            displayEl.textContent = '--';
+            displayEl.classList.add('chart-price-latest-empty');
+            return;
+        }
+
+        const formattedEntries = chartInstance.symbols.map(symbol => {
+            const dataset = chartInstance.chart.data.datasets.find(ds => ds.label === symbol);
+            let latestPrice = null;
+
+            if (dataset && Array.isArray(dataset.data) && dataset.data.length > 0) {
+                const lastPoint = dataset.data[dataset.data.length - 1];
+                latestPrice = Number(lastPoint?.y);
+            }
+
+            if (!Number.isFinite(latestPrice) && latestAssetPrices[symbol] != null) {
+                latestPrice = Number(latestAssetPrices[symbol]);
+            }
+
+            if (!Number.isFinite(latestPrice) && availableAssetDetails[symbol]?.price != null) {
+                latestPrice = Number(availableAssetDetails[symbol].price);
+            }
+
+            if (!Number.isFinite(latestPrice)) {
+                return `${symbol}: --`;
+            }
+
+            return `${symbol}: ${formatCurrencyLocale(latestPrice)}`;
+        });
+
+        if (formattedEntries.length === 0) {
+            displayEl.textContent = '--';
+            displayEl.classList.add('chart-price-latest-empty');
+            return;
+        }
+
+        const hasValues = formattedEntries.some(entry => !entry.endsWith('--'));
+
+        displayEl.textContent = formattedEntries.join(' | ');
+        displayEl.classList.toggle('chart-price-latest-empty', !hasValues);
     }
 
     function updateChartData(symbol, newDataPoint) {
@@ -1566,6 +1635,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                     chartInstance.chart.update('none');
+                    updateChartLatestPrices(chartInstance.index);
                 }
             }
         });
@@ -1751,6 +1821,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Update price display for each chart
                     updatePriceDisplay(symbol);
                 }
+
+                chartInstances.forEach(instance => {
+                    updateChartLatestPrices(instance.index);
+                });
                 
                 // Reapply search filter after table update
                 applyAssetSearchFilter();
@@ -1794,6 +1868,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     updatePriceDisplay(symbol);
                 }
+
+                chartInstances.forEach(instance => {
+                    updateChartLatestPrices(instance.index);
+                });
                 
                 // Reapply search filter after table update
                 applyAssetSearchFilter();
