@@ -2256,7 +2256,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 quantity: quantity
             });
             quantityInput.value = '';
-            assetInput.value = '';
         }
     });
 
