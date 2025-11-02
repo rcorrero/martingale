@@ -125,22 +125,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getInstrumentColor(symbol, assetData = null) {
-        // If asset data provided with color, use it and cache it
-        if (assetData && assetData.color) {
-            instrumentColors[symbol] = assetData.color;
-            return assetData.color;
+        const directColor = typeof assetData === 'string'
+            ? assetData
+            : (assetData && assetData.color) ? assetData.color : null;
+
+        // If a definitive color is provided, cache and return it immediately
+        if (directColor) {
+            instrumentColors[symbol] = directColor;
+            return directColor;
         }
-        
+
         // If color already cached, return it
         if (instrumentColors[symbol]) {
             return instrumentColors[symbol];
         }
-        
+
         // Fallback: assign a new color from the palette
         const color = colorPalette[colorIndex % colorPalette.length];
         instrumentColors[symbol] = color;
         colorIndex++;
-        
+
         return color;
     }
 
@@ -1255,7 +1259,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function createTransactionRow(transaction, options = {}) {
         const { includeUser = false } = options;
-        const color = getInstrumentColor(transaction.symbol);
+        const resolvedSymbol = transaction.symbol || 'UNKNOWN';
+        const colorHint = transaction.color ? transaction.color : null;
+        const color = getInstrumentColor(resolvedSymbol, colorHint);
         const row = document.createElement('tr');
         row.className = `transaction-${transaction.type}`;
 
@@ -1265,7 +1271,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const cells = [
             `<td data-label="Time" style="color: #94a3b8; font-size: 11px; white-space: nowrap;">${formatCompactDateTime(transaction.timestamp)}</td>`,
-            `<td data-label="Symbol"><span class="symbol-badge" style="background-color: ${color};">${transaction.symbol}</span></td>`,
+            `<td data-label="Symbol"><span class="symbol-badge" style="background-color: ${color};">${resolvedSymbol}</span></td>`,
             `<td data-label="Type" style="color: ${typeColor}; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">${typeText}</td>`,
             `<td data-label="Quantity" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace;">${formatQuantity(transaction.quantity)}</td>`,
             `<td data-label="Price" style="color: #00d4ff; font-family: 'JetBrains Mono', monospace;">${formatCurrencyLocale(transaction.price)}</td>`,
@@ -1284,7 +1290,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!transactionsTableBody) return;
 
         transactionsTableBody.innerHTML = '';
-        const sortedTransactions = [...userTransactions].reverse();
+        const sortedTransactions = sortTransactionsDescending(userTransactions);
 
         sortedTransactions.forEach(transaction => {
             const row = createTransactionRow(transaction);
@@ -1296,7 +1302,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!allTransactionsTableBody) return;
 
         allTransactionsTableBody.innerHTML = '';
-        const sortedTransactions = [...globalTransactions];
+        const sortedTransactions = sortTransactionsDescending(globalTransactions);
 
         sortedTransactions.forEach(transaction => {
             const row = createTransactionRow(transaction, { includeUser: true });
@@ -1387,6 +1393,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }, delay);
     }
 
+    function sortTransactionsDescending(transactions) {
+        if (!Array.isArray(transactions)) {
+            return [];
+        }
+
+        return [...transactions].sort((a, b) => {
+            const aTime = Number(a && a.timestamp != null ? a.timestamp : 0);
+            const bTime = Number(b && b.timestamp != null ? b.timestamp : 0);
+            if (bTime !== aTime) {
+                return bTime - aTime;
+            }
+
+            const aSymbol = (a && a.symbol) ? String(a.symbol) : '';
+            const bSymbol = (b && b.symbol) ? String(b.symbol) : '';
+            if (aSymbol !== bSymbol) {
+                return bSymbol.localeCompare(aSymbol);
+            }
+
+            const aType = (a && a.type) ? String(a.type) : '';
+            const bType = (b && b.type) ? String(b.type) : '';
+            return bType.localeCompare(aType);
+        });
+    }
+
     function normalizeTransaction(transaction) {
         if (!transaction) {
             return null;
@@ -1403,7 +1433,9 @@ document.addEventListener('DOMContentLoaded', () => {
             quantity: Number(transaction.quantity ?? 0),
             price: Number(transaction.price ?? 0),
             total_cost: Number(transaction.total_cost ?? 0),
-            user_id: transaction.user_id ?? null
+            user_id: transaction.user_id ?? null,
+            asset_id: transaction.asset_id ?? null,
+            color: transaction.color ?? null
         };
     }
 
@@ -2067,7 +2099,9 @@ document.addEventListener('DOMContentLoaded', () => {
         fetch('/api/transactions').then(response => response.json()),
         fetch('/api/portfolio').then(response => response.json())
     ]).then(([transactions, portfolio]) => {
-        userTransactions = transactions;
+        userTransactions = Array.isArray(transactions)
+            ? transactions.map(normalizeTransaction).filter(Boolean)
+            : [];
         userPortfolio = portfolio;
         currentUserId = portfolio.user_id; // Store user ID
         setAvailableCash(portfolio.cash);
@@ -2264,8 +2298,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 setAvailableCash(portfolio.cash);
                 
                 // Update transactions if included in response
-                if (portfolio.transactions) {
-                    userTransactions = portfolio.transactions;
+                if (Array.isArray(portfolio.transactions)) {
+                    userTransactions = portfolio.transactions
+                        .map(normalizeTransaction)
+                        .filter(Boolean);
                     updateTransactionsTable();
                 }
                 

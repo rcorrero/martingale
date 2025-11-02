@@ -150,7 +150,8 @@ class AssetManager:
                         'price': transaction.price,
                         'total_cost': transaction.total_cost,  # Use total_cost not total!
                         'asset_id': transaction.asset_id,
-                        'user_id': portfolio.user_id
+                        'user_id': portfolio.user_id,
+                        'color': asset.color
                     }
                     stats['transactions'].append(transaction_data)
                     
@@ -321,7 +322,8 @@ class AssetManager:
                         'quantity': transaction_data.get('quantity'),
                         'price': transaction_data.get('price'),
                         'total_cost': transaction_data.get('total_cost'),
-                        'user_id': transaction_data.get('user_id')
+                        'user_id': transaction_data.get('user_id'),
+                        'color': transaction_data.get('color')
                     }
                     self.socketio.emit('global_transaction_update', public_transaction)
                     logger.info(f"Broadcasted settlement transaction for {transaction_data['symbol']} user {transaction_data['user_id']}")

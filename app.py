@@ -405,21 +405,59 @@ def get_portfolio():
     portfolio = get_user_portfolio(current_user)
     holdings_by_symbol = portfolio.get_holdings_by_symbol()
     position_info_by_symbol = portfolio.get_position_info_by_symbol()
+    transaction_limit = request.args.get('limit', 200, type=int) or 200
+    transaction_limit = max(1, min(transaction_limit, 500))
+
+    user_transactions = (
+        Transaction.query
+        .filter_by(user_id=current_user.id)
+        .order_by(Transaction.timestamp.desc())
+        .limit(transaction_limit)
+        .all()
+    )
+
+    holdings_map = portfolio.get_holdings() or {}
+    related_asset_ids = {asset_id for asset_id in holdings_map.keys() if asset_id}
+    related_asset_ids.update(t.asset_id for t in user_transactions if t.asset_id)
+
+    asset_colors = {}
+    if related_asset_ids:
+        assets = Asset.query.filter(Asset.id.in_(related_asset_ids)).all()
+        for asset in assets:
+            if asset.symbol and asset.color:
+                asset_colors[asset.symbol] = asset.color
+
+    transactions_payload = []
+    for transaction in user_transactions:
+        timestamp = int(transaction.timestamp) if transaction.timestamp is not None else 0
+        color = None
+        if transaction.asset and transaction.asset.color:
+            color = transaction.asset.color
+        elif transaction.symbol and transaction.symbol in asset_colors:
+            color = asset_colors[transaction.symbol]
+
+        if transaction.asset and transaction.asset.symbol and transaction.asset.color:
+            asset_colors.setdefault(transaction.asset.symbol, transaction.asset.color)
+
+        transactions_payload.append({
+            'timestamp': timestamp,
+            'symbol': transaction.symbol,
+            'type': transaction.type,
+            'asset_id': transaction.asset_id,
+            'quantity': transaction.quantity,
+            'price': transaction.price,
+            'total_cost': transaction.total_cost,
+            'user_id': transaction.user_id,
+            'color': color
+        })
     
     return jsonify({
         'user_id': current_user.id,
         'cash': portfolio.cash,
         'holdings': holdings_by_symbol,
         'position_info': position_info_by_symbol,
-        'transactions': [{
-            'timestamp': int(t.timestamp),  # t.timestamp is already a float in milliseconds
-            'symbol': t.symbol,
-            'type': t.type,  # Use 'type' not 'transaction_type'
-            'asset_id': t.asset_id,
-            'quantity': t.quantity,
-            'price': t.price,
-            'total_cost': t.total_cost
-        } for t in portfolio.user.transactions]
+        'asset_colors': asset_colors,
+        'transactions': transactions_payload
     })
 
 def calculate_portfolio_performance(portfolio, current_prices=None, active_assets=None, log_details=False):
@@ -850,15 +888,34 @@ def debug_portfolio():
 @app.route('/api/transactions', methods=['GET'])
 @login_required
 def get_transactions():
-    transactions = [{
-        'timestamp': int(t.timestamp),  # t.timestamp is already a float in milliseconds
-        'symbol': t.symbol,
-        'type': t.type,  # Use 'type' not 'transaction_type'
-        'quantity': t.quantity,
-        'price': t.price,
-        'total_cost': t.total_cost
-    } for t in current_user.transactions]
-    return jsonify(transactions)
+    limit = request.args.get('limit', 200, type=int) or 200
+    limit = max(1, min(limit, 500))
+
+    transactions = (
+        Transaction.query
+        .filter_by(user_id=current_user.id)
+        .order_by(Transaction.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+
+    payload = []
+    for transaction in transactions:
+        timestamp = int(transaction.timestamp) if transaction.timestamp is not None else 0
+        color = transaction.asset.color if transaction.asset and transaction.asset.color else None
+        payload.append({
+            'timestamp': timestamp,
+            'symbol': transaction.symbol,
+            'type': transaction.type,
+            'asset_id': transaction.asset_id,
+            'quantity': transaction.quantity,
+            'price': transaction.price,
+            'total_cost': transaction.total_cost,
+            'user_id': transaction.user_id,
+            'color': color
+        })
+
+    return jsonify(payload)
 
 @app.route('/api/transactions/all', methods=['GET'])
 @login_required
@@ -873,13 +930,14 @@ def get_all_transactions():
                     .all())
 
     return jsonify([{
-        'timestamp': int(t.timestamp),
+        'timestamp': int(t.timestamp) if t.timestamp is not None else 0,
         'symbol': t.symbol,
         'type': t.type,
         'quantity': t.quantity,
         'price': t.price,
         'total_cost': t.total_cost,
-        'user_id': t.user_id
+        'user_id': t.user_id,
+        'color': t.asset.color if t.asset and t.asset.color else None
     } for t in transactions])
 
 @app.route('/api/leaderboard', methods=['GET'])
@@ -1093,7 +1151,8 @@ def handle_trade(data):
                     'quantity': quantity,
                     'price': price,
                     'total_cost': cost,
-                    'user_id': current_user.id
+                    'user_id': current_user.id,
+                    'color': asset.color
                 })
                 socketio.emit('global_transaction_update', {
                     'timestamp': int(timestamp),
@@ -1102,7 +1161,8 @@ def handle_trade(data):
                     'quantity': quantity,
                     'price': price,
                     'total_cost': cost,
-                    'user_id': current_user.id
+                    'user_id': current_user.id,
+                    'color': asset.color
                 })
             else:
                 emit('trade_confirmation', {'success': False, 'message': 'Insufficient funds', 'symbol': symbol, 'type': 'buy', 'quantity': quantity})
@@ -1148,7 +1208,8 @@ def handle_trade(data):
                     'quantity': quantity,
                     'price': price,
                     'total_cost': cost,
-                    'user_id': current_user.id
+                    'user_id': current_user.id,
+                    'color': asset.color
                 })
                 socketio.emit('global_transaction_update', {
                     'timestamp': int(timestamp),
@@ -1157,7 +1218,8 @@ def handle_trade(data):
                     'quantity': quantity,
                     'price': price,
                     'total_cost': cost,
-                    'user_id': current_user.id
+                    'user_id': current_user.id,
+                    'color': asset.color
                 })
             else:
                 emit('trade_confirmation', {'success': False, 'message': 'Insufficient holdings', 'symbol': symbol, 'type': 'sell', 'quantity': quantity})
