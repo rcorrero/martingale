@@ -1325,7 +1325,8 @@ td {
 .footer-disclaimer p {
     margin: 0;
     font-size: 14px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'IBM Plex Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
 }
 
 .footer-disclaimer strong {
@@ -1335,7 +1336,7 @@ td {
 .footer-copyright {
     color: var(--terminal-text-secondary);
     font-size: 12px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: 'IBM Plex Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
 }
 
 .footer-copyright p {
