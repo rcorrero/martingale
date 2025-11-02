@@ -261,6 +261,7 @@ h2 {
 /* Make Trade section sticky and always visible */
 .trade-section {
     position: sticky;
+        width: 100%;
     top: 20px;
     z-index: 100;
     border: 1px solid var(--terminal-border-strong);
@@ -273,7 +274,7 @@ h2 {
     50% { opacity: 0.7; transform: scale(1.1); }
 }
 
-#trade-form {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     background: var(--terminal-surface);
     border: 1px solid var(--terminal-border);
     border-radius: 10px;
@@ -1283,6 +1284,8 @@ td {
     /* Assets table optimizations */
     #assets-table {
         font-size: 11px;
+        min-width: 0;
+        width: 100%;
     }
 
     .buying-power-card {
@@ -1567,19 +1570,34 @@ td {
     #assets-table,
     #transactions-table {
         display: block;
+        width: 100% !important;
+        max-width: 100%;
+        min-width: 0 !important;
+        table-layout: fixed;
+        overflow-x: hidden;
+        margin: 0;
+    }
+
+    #assets-table tbody,
+    #transactions-table tbody {
+        display: grid;
+        gap: 12px;
         width: 100%;
-        overflow-x: auto;
+        margin: 0;
+        padding: 0;
     }
 
     #assets-table tbody tr,
     #transactions-table tbody tr {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 6px 12px;
         padding: 12px 10px;
-        margin-bottom: 10px;
+    margin: 0;
         border-radius: 8px;
         border: 1px solid rgba(148, 163, 184, 0.16);
+        width: 100%;
+        box-sizing: border-box;
     }
 
     #assets-table tbody tr:last-child,
