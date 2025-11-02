@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const transactionsTableBody = document.querySelector('#transactions-table tbody');
     const allTransactionsTableBody = document.querySelector('#all-transactions-table tbody');
     const leaderboardTableBody = document.querySelector('#leaderboard-table tbody');
+    const portfolioValueLatestEl = document.getElementById('portfolio-value-latest');
     
     // Time display elements
     const utcTimeEl = document.getElementById('utc-time');
@@ -47,6 +48,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let latestAssetPrices = {}; // Cache latest prices for buying power calculations
     let availableCashAmount = 0; // Track current available cash
     const GLOBAL_TRANSACTIONS_LIMIT = 100;
+    const PORTFOLIO_HISTORY_LIMIT = 300;
+    let portfolioValueChart = null;
+    let portfolioHistoryData = [];
+    let portfolioHistoryRefreshTimer = null;
+    let portfolioHistoryRequest = null;
 
     // Function to apply asset search filter
     function applyAssetSearchFilter() {
@@ -621,6 +627,245 @@ document.addEventListener('DOMContentLoaded', () => {
         return `${month}/${day} ${hours}:${minutes}:${seconds}`;
     }
 
+    function updatePortfolioHistoryLatestLabel(latestValue = null) {
+        if (!portfolioValueLatestEl) {
+            return;
+        }
+
+        if (latestValue != null) {
+            portfolioValueLatestEl.textContent = formatCurrencyLocale(latestValue);
+            return;
+        }
+
+        if (!portfolioHistoryData.length) {
+            portfolioValueLatestEl.textContent = '--';
+            return;
+        }
+
+        const mostRecent = portfolioHistoryData[portfolioHistoryData.length - 1];
+        portfolioValueLatestEl.textContent = formatCurrencyLocale(mostRecent.y);
+    }
+
+    function getPortfolioHistoryChartOptions() {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: {
+                padding: {
+                    top: 15,
+                    right: 20,
+                    bottom: 15,
+                    left: 20
+                }
+            },
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: 'minute',
+                        displayFormats: {
+                            minute: 'HH:mm'
+                        },
+                        tooltipFormat: 'MMM dd, HH:mm:ss'
+                    },
+                    adapters: {
+                        date: {}
+                    },
+                    ticks: {
+                        color: '#94a3b8',
+                        maxRotation: 0,
+                        maxTicksLimit: 6,
+                        font: {
+                            family: 'JetBrains Mono, Consolas, Monaco, monospace',
+                            size: 12
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(45, 55, 72, 0.6)',
+                        borderColor: '#2d3748'
+                    },
+                    border: {
+                        color: '#2d3748'
+                    }
+                },
+                y: {
+                    beginAtZero: false,
+                    ticks: {
+                        color: '#94a3b8',
+                        callback: (value) => formatCurrencyLocale(value),
+                        font: {
+                            family: 'JetBrains Mono, Consolas, Monaco, monospace',
+                            size: 11
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(45, 55, 72, 0.6)',
+                        borderColor: '#2d3748'
+                    },
+                    border: {
+                        color: '#2d3748'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    enabled: true,
+                    mode: 'nearest',
+                    intersect: false,
+                    backgroundColor: 'rgba(10, 14, 26, 0.95)',
+                    borderColor: '#2d3748',
+                    borderWidth: 1,
+                    cornerRadius: 6,
+                    titleColor: themeAccentColor,
+                    bodyColor: '#e2e8f0',
+                    titleFont: {
+                        family: 'JetBrains Mono, Consolas, Monaco, monospace',
+                        size: 12,
+                        weight: 600
+                    },
+                    bodyFont: {
+                        family: 'JetBrains Mono, Consolas, Monaco, monospace',
+                        size: 11
+                    },
+                    callbacks: {
+                        label: (context) => formatCurrencyLocale(context.parsed.y)
+                    },
+                    padding: 10
+                }
+            },
+            elements: {
+                line: {
+                    borderWidth: 2,
+                    tension: 0.25
+                },
+                point: {
+                    radius: 0,
+                    hitRadius: 12,
+                    hoverRadius: 5
+                }
+            },
+            interaction: {
+                mode: 'nearest',
+                intersect: false
+            }
+        };
+    }
+
+    function createPortfolioValueChart() {
+        if (portfolioValueChart) {
+            return portfolioValueChart;
+        }
+
+        const canvas = document.getElementById('portfolio-value-chart');
+        if (!canvas) {
+            return null;
+        }
+
+        const ctx = canvas.getContext('2d');
+        const accent = themeAccentColor || '#3b82f6';
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height || 280);
+        gradient.addColorStop(0, `${accent}33`);
+        gradient.addColorStop(1, `${accent}00`);
+
+        portfolioValueChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Portfolio Value',
+                    data: [],
+                    borderColor: accent,
+                    backgroundColor: gradient,
+                    fill: 'origin',
+                    tension: 0.2,
+                    pointRadius: 0,
+                    pointHoverRadius: 5,
+                    pointHoverBorderWidth: 2,
+                    pointHoverBorderColor: '#0a0e1a',
+                    pointHoverBackgroundColor: accent,
+                    spanGaps: true
+                }]
+            },
+            options: getPortfolioHistoryChartOptions()
+        });
+
+        updatePortfolioHistoryLatestLabel();
+
+        return portfolioValueChart;
+    }
+
+    function updatePortfolioValueChart() {
+        const chart = createPortfolioValueChart();
+        if (!chart) {
+            return;
+        }
+
+        chart.data.datasets[0].data = portfolioHistoryData.slice();
+        chart.update('none');
+    }
+
+    function refreshPortfolioHistory(limit = PORTFOLIO_HISTORY_LIMIT) {
+        const canvas = document.getElementById('portfolio-value-chart');
+        if (!canvas) {
+            return Promise.resolve();
+        }
+
+        if (portfolioHistoryRequest) {
+            return portfolioHistoryRequest;
+        }
+
+        portfolioHistoryRequest = fetch(`/api/performance/history?limit=${limit}`)
+            .then(response => {
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return null;
+                }
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data || !Array.isArray(data.points)) {
+                    return;
+                }
+
+                portfolioHistoryData = data.points
+                    .map(point => ({
+                        x: Number(point.time),
+                        y: Number(point.value)
+                    }))
+                    .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
+
+                // Ensure data sorted chronologically
+                portfolioHistoryData.sort((a, b) => a.x - b.x);
+
+                updatePortfolioValueChart();
+                updatePortfolioHistoryLatestLabel();
+            })
+            .catch(error => {
+                console.error('Error fetching portfolio history:', error);
+            })
+            .finally(() => {
+                portfolioHistoryRequest = null;
+            });
+
+        return portfolioHistoryRequest;
+    }
+
+    function schedulePortfolioHistoryRefresh(delay = 2000) {
+        if (portfolioHistoryRefreshTimer) {
+            return;
+        }
+
+        portfolioHistoryRefreshTimer = setTimeout(() => {
+            portfolioHistoryRefreshTimer = null;
+            refreshPortfolioHistory();
+        }, delay);
+    }
+
     function formatTimeToExpiry(seconds) {
         // Format time remaining until expiration
         if (seconds <= 0) {
@@ -873,6 +1118,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Update portfolio value
                 portfolioValueEl.textContent = formatCurrencyLocale(performance.portfolio_value);
+                updatePortfolioHistoryLatestLabel(performance.portfolio_value);
                 
                 // Update total P&L with color coding
                 totalPnlEl.textContent = formatCurrencyLocale(performance.total_pnl);
@@ -914,6 +1160,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Error fetching performance data
                 // Set fallback values to prevent NaN display
                 portfolioValueEl.textContent = formatCurrencyLocale(100000);
+                updatePortfolioHistoryLatestLabel(100000);
                 totalPnlEl.textContent = formatCurrencyLocale(0);
                 totalReturnEl.textContent = formatPercentage(0);
                 realizedPnlEl.textContent = formatCurrencyLocale(0);
@@ -1422,6 +1669,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePerformance();
         refreshGlobalTransactions();
         refreshLeaderboard();
+        refreshPortfolioHistory();
         
         // Update VWAP lines for all charts after portfolio is loaded
         Object.keys(charts).forEach(symbol => {
@@ -1435,6 +1683,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle real-time performance updates
     socket.on('performance_update', () => {
         updatePerformance();
+        schedulePortfolioHistoryRefresh(2000);
     });
 
     // Update performance on price changes (for unrealized P&L)
@@ -1449,6 +1698,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Update pie chart with new portfolio values
         createOrUpdatePortfoliePieChart();
+        schedulePortfolioHistoryRefresh(1500);
     });
 
     function updateAssetsTable(assets) {
@@ -1681,6 +1931,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateAssetsTable(assets);
             });
         scheduleLeaderboardRefresh(1500);
+        schedulePortfolioHistoryRefresh(1200);
     });
 
     // Handle new transactions
@@ -1694,6 +1945,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateVWAPLine(transaction.symbol);
         }
         scheduleLeaderboardRefresh(1000);
+        schedulePortfolioHistoryRefresh(800);
     });
 
     socket.on('global_transaction_update', (transaction) => {
@@ -1727,6 +1979,7 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('performance_update', () => {
         updatePerformance();
         scheduleLeaderboardRefresh(2000);
+        schedulePortfolioHistoryRefresh(2000);
     });
 
     // Handle asset expiration and settlement events
@@ -1757,6 +2010,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Error fetching assets
             });
         scheduleLeaderboardRefresh(2000);
+        schedulePortfolioHistoryRefresh(2000);
     });
 
     // Handle portfolio refresh signal
@@ -1765,6 +2019,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updatePerformance();
         createOrUpdatePortfoliePieChart();
         scheduleLeaderboardRefresh(1500);
+        schedulePortfolioHistoryRefresh(1500);
     });
 
     // Auto-populate quantity based on asset selection and position
@@ -1999,7 +2254,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Initialize chart system
+    // Initialize portfolio value chart and price charts
+    createPortfolioValueChart();
     initializeChartSystem();
 
     // Set up symbol badge click handlers

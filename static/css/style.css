@@ -1132,6 +1132,49 @@ td {
     flex: 1 1 auto;
 }
 
+.portfolio-value-section {
+    width: 100%;
+    margin-bottom: 22px;
+}
+
+.portfolio-value-card {
+    min-height: 340px;
+    padding: 20px 18px 24px;
+}
+
+.portfolio-value-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.portfolio-value-header h3 {
+    margin: 0;
+    color: var(--terminal-accent);
+    font-size: 16px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+}
+
+.portfolio-value-latest {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--terminal-text);
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    border-radius: 8px;
+    padding: 6px 12px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+#portfolio-value-chart {
+    width: 100% !important;
+    height: 260px !important;
+}
+
 .price-display {
     position: relative;
     align-self: flex-end;
@@ -1373,6 +1416,26 @@ td {
         font-size: 0.68em;
     }
 
+    .portfolio-value-card {
+        min-height: 300px;
+        padding: 16px 12px 18px;
+    }
+
+    .portfolio-value-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .portfolio-value-latest {
+        font-size: 16px;
+        padding: 6px 10px;
+    }
+
+    #portfolio-value-chart {
+        height: 220px !important;
+    }
+
     .buying-power-card {
         padding: 16px;
     }
@@ -1505,6 +1568,19 @@ td {
         min-height: 320px;
         height: auto;
         border-radius: 10px;
+    }
+
+    .portfolio-value-card {
+        min-height: 260px;
+        padding: 14px 10px 14px;
+    }
+
+    .portfolio-value-latest {
+        font-size: 15px;
+    }
+
+    #portfolio-value-chart {
+        height: 200px !important;
     }
     
     /* Reduce section padding */

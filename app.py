@@ -15,6 +15,7 @@ import os
 import logging
 import re
 from datetime import datetime, timedelta
+from collections import defaultdict
 from sqlalchemy import inspect, text, or_
 from sqlalchemy.exc import SQLAlchemyError
 from config import config
@@ -157,7 +158,7 @@ ensure_settlement_asset_schema()
 # Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login'
+login_manager.login_view = 'login'  # type: ignore[assignment]
 
 # Security: Rate limiting for login attempts
 login_attempts = {}
@@ -370,7 +371,7 @@ def register():
         
         try:
             # Create new user
-            user = User(username=username)
+            user = User(username=username)  # type: ignore[call-arg]
             user.set_password(form.password.data)
             db.session.add(user)
             db.session.commit()
@@ -575,6 +576,264 @@ def get_performance():
         'total_pnl': round(performance['total_pnl'], 2),
         'total_return': round(performance['total_return'], 2)
     })
+
+
+@app.route('/api/performance/history', methods=['GET'])
+@login_required
+def get_performance_history():
+    """Return a time series of portfolio value for the current user."""
+    limit = request.args.get('limit', 300, type=int) or 300
+    limit = max(50, min(limit, 1000))
+
+    portfolio = get_user_portfolio(current_user)
+    transactions = (Transaction.query
+                    .filter_by(user_id=current_user.id)
+                    .order_by(Transaction.timestamp.asc())
+                    .all())
+
+    final_holdings = portfolio.get_holdings()
+    relevant_asset_ids = set(final_holdings.keys())
+    missing_symbols = set()
+
+    for transaction in transactions:
+        if transaction.asset_id:
+            relevant_asset_ids.add(transaction.asset_id)
+        elif transaction.legacy_symbol:
+            missing_symbols.add(transaction.legacy_symbol)
+
+    assets_from_symbols = []
+    if missing_symbols:
+        assets_from_symbols = Asset.query.filter(Asset.symbol.in_(missing_symbols)).all()
+        for asset in assets_from_symbols:
+            relevant_asset_ids.add(asset.id)
+
+    assets = Asset.query.filter(Asset.id.in_(relevant_asset_ids)).all() if relevant_asset_ids else []
+    asset_by_id = {asset.id: asset for asset in assets}
+    asset_by_symbol = {asset.symbol: asset for asset in assets if asset.symbol}
+
+    for asset in assets_from_symbols:
+        asset_by_id[asset.id] = asset
+        if asset.symbol:
+            asset_by_symbol[asset.symbol] = asset
+
+    for asset_id in final_holdings.keys():
+        if asset_id not in asset_by_id:
+            asset = Asset.query.get(asset_id)
+            if asset:
+                asset_by_id[asset.id] = asset
+                if asset.symbol:
+                    asset_by_symbol[asset.symbol] = asset
+
+    current_cash = float(portfolio.cash or 0.0)
+    initial_cash = current_cash
+
+    for transaction in reversed(transactions):
+        total_cost = float(transaction.total_cost or 0.0)
+        tx_type = (transaction.type or '').lower()
+        if tx_type == 'buy':
+            initial_cash += total_cost
+        elif tx_type in ('sell', 'settlement'):
+            initial_cash -= total_cost
+
+    snapshots = [{
+        'timestamp': None,
+        'cash': initial_cash,
+        'holdings': {}
+    }]
+    holdings_state = defaultdict(float)
+    cash_state = initial_cash
+
+    now_ms = int(time.time() * 1000)
+
+    for transaction in transactions:
+        tx_type = (transaction.type or '').lower()
+        total_cost = float(transaction.total_cost or 0.0)
+        quantity = float(transaction.quantity or 0.0)
+        asset_id = transaction.asset_id
+
+        if not asset_id and transaction.legacy_symbol:
+            asset = asset_by_symbol.get(transaction.legacy_symbol)
+            if not asset:
+                asset = Asset.query.filter_by(symbol=transaction.legacy_symbol).order_by(Asset.created_at.desc()).first()
+                if asset:
+                    asset_by_id[asset.id] = asset
+                    if asset.symbol:
+                        asset_by_symbol[asset.symbol] = asset
+                        relevant_asset_ids.add(asset.id)
+            if asset:
+                asset_id = asset.id
+
+        if tx_type not in ('buy', 'sell', 'settlement'):
+            continue
+
+        if asset_id is None and tx_type != 'settlement':
+            # Without an asset reference we cannot value this trade
+            continue
+
+        if tx_type == 'buy':
+            cash_state -= total_cost
+            if asset_id is not None:
+                holdings_state[asset_id] += quantity
+        elif tx_type == 'sell':
+            cash_state += total_cost
+            if asset_id is not None:
+                holdings_state[asset_id] -= quantity
+        elif tx_type == 'settlement':
+            cash_state += total_cost
+            if asset_id is not None:
+                holdings_state[asset_id] = 0.0
+
+        if asset_id is not None and holdings_state[asset_id] < 0:
+            holdings_state[asset_id] = 0.0
+
+        keys_to_delete = [aid for aid, qty in holdings_state.items() if abs(qty) < 1e-8]
+        for aid in keys_to_delete:
+            holdings_state.pop(aid, None)
+
+        sanitized_holdings = {aid: qty for aid, qty in holdings_state.items()}
+        timestamp = int(transaction.timestamp) if transaction.timestamp is not None else now_ms
+        snapshots.append({
+            'timestamp': timestamp,
+            'cash': cash_state,
+            'holdings': sanitized_holdings
+        })
+
+    final_snapshot_holdings = {aid: float(qty) for aid, qty in final_holdings.items() if abs(float(qty)) > 1e-8}
+    snapshots.append({
+        'timestamp': now_ms,
+        'cash': float(portfolio.cash or 0.0),
+        'holdings': final_snapshot_holdings
+    })
+
+    relevant_symbols = {asset.symbol for asset in asset_by_id.values() if asset and asset.symbol}
+    history_limit = max(limit * 2, 200)
+    raw_history = price_service.get_price_history(limit=history_limit) if relevant_symbols else {}
+    current_prices = price_service.get_current_prices() if relevant_symbols else {}
+
+    filtered_history = {}
+    min_history_time = None
+
+    for symbol in relevant_symbols:
+        history_points = raw_history.get(symbol, []) or []
+        deduped = {}
+        for point in history_points:
+            ts = point.get('time')
+            price_val = point.get('price')
+            try:
+                ts_int = int(ts)
+                price_float = float(price_val)
+            except (TypeError, ValueError):
+                continue
+            deduped[ts_int] = price_float
+
+        current_info = current_prices.get(symbol)
+        if current_info:
+            last_update = current_info.get('last_update')
+            try:
+                current_ts = int(last_update) if last_update is not None else now_ms
+            except (TypeError, ValueError):
+                current_ts = now_ms
+            try:
+                price_float = float(current_info.get('price'))
+            except (TypeError, ValueError):
+                price_float = None
+            if price_float is not None:
+                deduped[current_ts] = price_float
+
+        sorted_points = [{'time': ts, 'price': price} for ts, price in sorted(deduped.items())]
+        filtered_history[symbol] = sorted_points
+        if sorted_points:
+            symbol_first_time = sorted_points[0]['time']
+            if min_history_time is None or symbol_first_time < min_history_time:
+                min_history_time = symbol_first_time
+
+    timeline_set = set()
+    for history in filtered_history.values():
+        for point in history:
+            timeline_set.add(point['time'])
+
+    for snapshot in snapshots:
+        snapshot_time = snapshot['timestamp']
+        if snapshot_time is not None:
+            timeline_set.add(int(snapshot_time))
+
+    timeline_set.add(now_ms)
+    timeline = sorted(timeline_set)
+
+    if min_history_time is not None:
+        timeline = [ts for ts in timeline if ts >= min_history_time]
+
+    snapshots.sort(key=lambda snap: float('-inf') if snap['timestamp'] is None else snap['timestamp'])
+    asset_symbol_by_id = {asset_id: asset.symbol for asset_id, asset in asset_by_id.items() if asset and asset.symbol}
+
+    price_indices = {symbol: 0 for symbol in filtered_history.keys()}
+    points = []
+    snapshot_index = 0
+
+    for timestamp in timeline:
+        while snapshot_index + 1 < len(snapshots):
+            next_snapshot = snapshots[snapshot_index + 1]
+            next_time = next_snapshot['timestamp']
+            if next_time is not None and next_time <= timestamp:
+                snapshot_index += 1
+            else:
+                break
+
+        current_snapshot = snapshots[snapshot_index]
+        cash_value = float(current_snapshot['cash'])
+        holdings = current_snapshot['holdings']
+        holdings_value = 0.0
+        missing_price = False
+
+        for asset_id, quantity in holdings.items():
+            if quantity <= 0:
+                continue
+            symbol = asset_symbol_by_id.get(asset_id)
+            if not symbol:
+                missing_price = True
+                break
+            history = filtered_history.get(symbol, [])
+            if not history:
+                missing_price = True
+                break
+            index = price_indices[symbol]
+            while index + 1 < len(history) and history[index + 1]['time'] <= timestamp:
+                index += 1
+            price_indices[symbol] = index
+            point = history[index]
+            if point['time'] > timestamp:
+                missing_price = True
+                break
+            price = point['price']
+            holdings_value += quantity * price
+
+        if missing_price:
+            continue
+
+        points.append({
+            'time': int(timestamp),
+            'value': round(cash_value + holdings_value, 2)
+        })
+
+    if not points:
+        performance = calculate_portfolio_performance(portfolio)
+        current_value = round(performance['portfolio_value'], 2)
+        baseline_time = max(now_ms - 60000, 0)
+        points = [
+            {'time': baseline_time, 'value': current_value},
+            {'time': now_ms, 'value': current_value}
+        ]
+    else:
+        deduped_points = {point['time']: point['value'] for point in points}
+        points = [{'time': ts, 'value': val} for ts, val in sorted(deduped_points.items())]
+        if len(points) == 1:
+            earlier_time = max(points[0]['time'] - 60000, 0)
+            points.insert(0, {'time': earlier_time, 'value': points[0]['value']})
+
+    if len(points) > limit:
+        points = points[-limit:]
+
+    return jsonify({'points': points})
 
 @app.route('/api/debug/portfolio', methods=['GET'])
 @login_required
