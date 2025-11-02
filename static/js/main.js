@@ -777,14 +777,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // Dynamic Chart Management System
     let chartInstances = []; // Array of chart objects
     let chartCount = 1; // Default number of charts
-    let availableAssets = []; // Store available assets for autocomplete
+    let availableAssets = []; // Store available asset symbols for autocomplete
+    let availableAssetDetails = {}; // Cache asset metadata (including colors)
 
     function initializeChartSystem() {
         // Load available assets for autocomplete
         fetch('/api/assets')
             .then(response => response.json())
             .then(assets => {
+                availableAssetDetails = assets || {};
                 availableAssets = Object.keys(assets).sort(); // Sort alphabetically
+
+                // Seed instrument color cache using authoritative asset colors
+                availableAssets.forEach(symbol => {
+                    const assetData = availableAssetDetails[symbol];
+                    if (assetData) {
+                        getInstrumentColor(symbol, assetData);
+                    }
+                });
                 createInitialCharts();
             });
     }
@@ -1061,7 +1071,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     .sort((a, b) => a.time - b.time)
                     .map(point => ({x: point.time, y: point.price})); // Transform to Chart.js format
                 
-                const color = getInstrumentColor(symbol);
+                const assetData = availableAssetDetails[symbol] || null;
+                const color = getInstrumentColor(symbol, assetData);
                 
                 const dataset = {
                     label: symbol,
@@ -1129,7 +1140,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!symbolsList || !chartInstance) return;
 
         symbolsList.innerHTML = chartInstance.symbols.map(symbol => {
-            const color = getInstrumentColor(symbol);
+            const assetData = availableAssetDetails[symbol] || null;
+            const color = getInstrumentColor(symbol, assetData);
             return `
                 <span class="chart-symbol-tag" style="background-color: ${color}20; border-left: 3px solid ${color};">
                     ${symbol}
@@ -1304,6 +1316,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const assetData = assets[symbol];
                     const currentPrice = assetData.price;
                     latestAssetPrices[symbol] = currentPrice;
+                    availableAssetDetails[symbol] = assetData;
                     const color = getInstrumentColor(symbol, assetData);
                     
                     // Determine price color based on change

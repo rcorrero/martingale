@@ -274,33 +274,22 @@ h2 {
     50% { opacity: 0.7; transform: scale(1.1); }
 }
 
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+#trade-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     background: var(--terminal-surface);
     border: 1px solid var(--terminal-border);
     border-radius: 10px;
     padding: 18px;
     box-shadow: 0 16px 28px rgba(0, 0, 0, 0.45);
-    outline: none !important;
-    display: flex;
-    flex-wrap: wrap;
     gap: 10px;
     align-items: center;
     margin-top: 10px;
+    outline: none !important;
 }
 
 #trade-form:focus {
     outline: none !important;
-}
-
-@media (max-width: 768px) {
-    #transactions-table {
-        font-size: 10px;
-    }
-    
-    #transactions-table th {
-        padding: 6px 4px;
-        font-size: 10px;
-    }
 }
 
 .portfolio-content {
@@ -543,55 +532,93 @@ td {
     opacity: 0.6;
 }
 
-#assets-table {
-    font-size: 12px;
+#assets-table,
+#transactions-table {
+    display: block;
     width: 100%;
-    min-width: 520px; /* Ensure table can scroll horizontally on small screens */
+    min-width: 0;
     background: transparent;
-    border-radius: 6px;
-    border-collapse: separate !important;  /* Override global border-collapse */
-    border-spacing: 0;  /* Remove spacing between cells */
-    overflow: hidden;  /* Ensures rounded corners are visible */
+    border-radius: 12px;
+    border-collapse: separate !important;
+    border-spacing: 0;
 }
 
-/* Round the corners of the first and last cells in the header */
-#assets-table th:first-child {
-    border-top-left-radius: 6px;
+#assets-table thead,
+#transactions-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    border: 0;
+    white-space: nowrap;
 }
 
-#assets-table th:last-child {
-    border-top-right-radius: 6px;
+#assets-table tbody,
+#transactions-table tbody {
+    display: grid;
+    gap: 16px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
 }
 
-/* Round the corners of the first and last cells in the last row */
-#assets-table tbody tr:last-child td:first-child {
-    border-bottom-left-radius: 6px;
-}
-
-#assets-table tbody tr:last-child td:last-child {
-    border-bottom-right-radius: 6px;
-}
-
-#assets-table th {
-    background: rgba(59, 130, 246, 0.12);
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    color: var(--terminal-accent);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 11px;
-    padding: 10px 8px;
-}
-
-#assets-table tbody tr {
-    transition: all 0.2s ease;
+#assets-table tbody tr,
+#transactions-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 18px;
+    padding: 18px 16px;
+    border-radius: 12px;
     background: var(--terminal-surface);
+    border: 1px solid var(--terminal-border);
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.4);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    box-sizing: border-box;
 }
 
-#assets-table tbody tr:hover {
-    background: rgba(59, 130, 246, 0.12);
-    box-shadow: 0 0 18px rgba(59, 130, 246, 0.18);
+#assets-table tbody tr:hover,
+#transactions-table tbody tr:hover {
+    border-color: var(--terminal-border-strong);
+    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.55);
+    transform: translateY(-2px);
+}
+
+#assets-table td,
+#transactions-table td {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border: none;
+    padding: 0;
+    font-size: 0.95em;
+    color: var(--terminal-text-secondary);
+}
+
+#assets-table td::before,
+#transactions-table td::before {
+    content: attr(data-label);
+    font-size: 0.72em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--terminal-text-secondary);
+    opacity: 0.75;
+}
+
+#transactions-table tbody tr.transaction-buy {
+    background: rgba(16, 185, 129, 0.12);
+    border-left: 3px solid var(--terminal-success);
+    border-color: rgba(16, 185, 129, 0.35);
+}
+
+#transactions-table tbody tr.transaction-sell {
+    background: rgba(239, 68, 68, 0.12);
+    border-left: 3px solid var(--terminal-danger);
+    border-color: rgba(239, 68, 68, 0.35);
 }
 
 #holdings-list li {
@@ -1281,11 +1308,32 @@ td {
         padding: 12px;
     }
 
-    /* Assets table optimizations */
-    #assets-table {
+    /* Assets and transactions card adjustments */
+    #assets-table,
+    #transactions-table {
         font-size: 11px;
-        min-width: 0;
-        width: 100%;
+    }
+
+    #assets-table tbody,
+    #transactions-table tbody {
+        gap: 14px;
+    }
+
+    #assets-table tbody tr,
+    #transactions-table tbody tr {
+        padding: 16px 14px;
+        gap: 8px 14px;
+        border-radius: 10px;
+    }
+
+    #assets-table td,
+    #transactions-table td {
+        font-size: 0.9em;
+    }
+
+    #assets-table td::before,
+    #transactions-table td::before {
+        font-size: 0.68em;
     }
 
     .buying-power-card {
@@ -1294,12 +1342,6 @@ td {
 
     .buying-power-grid {
         grid-template-columns: 1fr;
-    }
-
-    #assets-table th,
-    #assets-table td {
-        padding: 8px 4px;
-        font-size: 11px;
     }
 
     .symbol-badge {
@@ -1543,7 +1585,7 @@ td {
     }
 
     #trade-form {
-        flex-direction: column;
+        grid-template-columns: 1fr;
         align-items: stretch;
     }
 
@@ -1567,66 +1609,27 @@ td {
         padding-right: 4px;
     }
 
-    #assets-table,
-    #transactions-table {
-        display: block;
-        width: 100% !important;
-        max-width: 100%;
-        min-width: 0 !important;
-        table-layout: fixed;
-        overflow-x: hidden;
-        margin: 0;
-    }
-
     #assets-table tbody,
     #transactions-table tbody {
-        display: grid;
         gap: 12px;
-        width: 100%;
-        margin: 0;
-        padding: 0;
     }
 
     #assets-table tbody tr,
     #transactions-table tbody tr {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        padding: 14px 12px;
         gap: 6px 12px;
-        padding: 12px 10px;
-    margin: 0;
-        border-radius: 8px;
-        border: 1px solid rgba(148, 163, 184, 0.16);
-        width: 100%;
-        box-sizing: border-box;
-    }
-
-    #assets-table tbody tr:last-child,
-    #transactions-table tbody tr:last-child {
-        margin-bottom: 0;
-    }
-
-    #assets-table th,
-    #transactions-table th {
-        display: none;
+        border-radius: 10px;
     }
 
     #assets-table td,
     #transactions-table td {
-        border: none;
-        padding: 4px 0;
-        font-size: 0.95em;
+        font-size: 0.88em;
     }
 
     #assets-table td::before,
     #transactions-table td::before {
-        content: attr(data-label);
-        display: block;
-        font-size: 0.75em;
-        font-weight: 600;
-        text-transform: uppercase;
-        color: var(--terminal-text-secondary);
+        font-size: 0.66em;
         margin-bottom: 2px;
-        letter-spacing: 0.6px;
     }
 
     .chart-container {
