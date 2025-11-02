@@ -685,6 +685,60 @@ td {
     display: inline-block;
 }
 
+#holdings-list li .holding-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    min-width: 0;
+}
+
+.holding-metric {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex: 0 1 220px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.holding-label {
+    color: var(--terminal-text-secondary);
+    font-size: 11px;
+    letter-spacing: 0.6px;
+    text-transform: none;
+}
+
+.holding-value {
+    display: inline-block;
+    vertical-align: baseline;
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+}
+
+.holding-value-cash,
+.holding-value-qty {
+    color: var(--terminal-text);
+}
+
+.holding-value-amount {
+    color: var(--terminal-success);
+}
+
+.holding-value-vwap {
+    color: var(--terminal-accent-secondary);
+}
+
+.holding-value-empty {
+    color: var(--terminal-text-secondary);
+    opacity: 0.7;
+}
+
 #trade-form input, #trade-form select {
     padding: 10px !important;
     border-radius: 4px !important;

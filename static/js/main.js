@@ -1945,9 +1945,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         
                         // Add cash as the first item in holdings list
                         const cashColor = '#00d4ff'; // Cash color for consistency
+                        const cashFormatted = formatNumber(portfolio.cash, 2);
                         const cashItem = `<li data-symbol="Cash" style="border-left: 3px solid ${cashColor}; padding-left: 12px; background: rgba(0, 0, 0, 0.3);">
-                            <span class="symbol-badge" style="background-color: ${cashColor}; margin-right: 8px;">CASH</span>
-                            <span class="cash-value" style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight: 600;">$${formatNumber(portfolio.cash, 2)}</span>
+                            <div class="holding-row">
+                                <span class="symbol-badge" style="background-color: ${cashColor};">CASH</span>
+                                <span class="cash-value holding-value holding-value-cash" title="$${cashFormatted}">$${cashFormatted}</span>
+                            </div>
                         </li>`;
                         holdingsList.innerHTML += cashItem;
                         
@@ -1963,13 +1966,25 @@ document.addEventListener('DOMContentLoaded', () => {
                                 const marketValue = currentPrice ? quantity * currentPrice : null;
                                 
                                 // Build the holding display with clear labels
-                                const quantityDisplay = `<span style="color: #94a3b8; font-size: 11px;">QTY:</span> <span style="color: #e2e8f0; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatQuantity(quantity)}</span>`;
-                                const marketValueDisplay = marketValue ? ` <span style="color: #94a3b8; font-size: 11px; margin-left: 12px;">VALUE:</span> <span style="color: #7dda58; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatCurrencyLocale(marketValue)}</span>` : '';
-                                const vwapDisplay = vwap ? ` <span style="color: #94a3b8; font-size: 11px; margin-left: 12px;">VWAP:</span> <span style="color: #00d4ff; font-family: 'JetBrains Mono', monospace; font-weight: 600;">${formatCurrencyLocale(vwap)}</span>` : '';
-                                
+                                const quantityDisplayValue = formatQuantity(quantity);
+                const quantityDisplay = `<span class="holding-metric">
+                                        <span class="holding-label">QTY:</span>
+                    <span class="holding-value holding-value-qty" title="${quantityDisplayValue}">${quantityDisplayValue}</span>
+                                    </span>`;
+                                const marketValueFormatted = marketValue != null ? formatCurrencyLocale(marketValue) : null;
+                                const marketValueDisplay = marketValueFormatted ? `<span class="holding-metric">
+                                        <span class="holding-label">VALUE:</span>
+                                        <span class="holding-value holding-value-amount" title="${marketValueFormatted}">${marketValueFormatted}</span>
+                                    </span>` : '';
+                                const vwapFormatted = vwap ? formatCurrencyLocale(vwap) : null;
+                                const vwapDisplay = vwapFormatted ? `<span class="holding-metric">
+                                        <span class="holding-label">VWAP:</span>
+                                        <span class="holding-value holding-value-vwap" title="${vwapFormatted}">${vwapFormatted}</span>
+                                    </span>` : '';
+
                                 const item = `<li data-symbol="${symbol}" style="border-left: 3px solid ${color}; padding-left: 12px; background: rgba(0, 0, 0, 0.3);">
-                                    <div style="display: flex; align-items: center; flex-wrap: wrap;">
-                                        <span class="symbol-badge" style="background-color: ${color}; margin-right: 12px;">${symbol}</span>
+                                    <div class="holding-row">
+                                        <span class="symbol-badge" style="background-color: ${color};">${symbol}</span>
                                         ${quantityDisplay}${marketValueDisplay}${vwapDisplay}
                                     </div>
                                 </li>`;
