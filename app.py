@@ -37,7 +37,7 @@ else:
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler('martingale.log'),
+            logging.FileHandler('debug.log'),
             logging.StreamHandler()
         ]
     )

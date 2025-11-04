@@ -11,6 +11,8 @@ from datetime import datetime
 import os
 import logging
 
+from pricing.train_pricing import load_policy, load_env_config, MarketEnv
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -21,13 +23,33 @@ logger = logging.getLogger(__name__)
 class PriceService:
     """Service for managing asset prices and price history."""
     
-    def __init__(self, config=None):
+    def __init__(self, config=None, use_loaded_policy=False):
         """Initialize the price service with asset configuration."""
         self.config = config or self._get_default_config()
         self.assets = {}
         self.running = False
         self.update_thread = None
+        self.use_loaded_policy = use_loaded_policy
         self._initialize_assets()
+
+        if self.use_loaded_policy:
+            self._env_cfg = load_env_config("pricing/env_config.json")
+            logger.info("Loaded environment config for PriceService")
+            self._env_cfg.T = 99999999
+            self.env = MarketEnv(self._env_cfg)  
+            self.s = self.env.reset()    
+            self.reloaded_policy, self.reloaded_ppo_cfg = load_policy(
+                "pricing/policy_weights.npz", state_dim=6, T=self._env_cfg.T
+            )        
+            logger.info("Loaded policy for PriceService")
+
+    # def __init__(self, config=None):
+    #     """Initialize the price service with asset configuration."""
+    #     self.config = config or self._get_default_config()
+    #     self.assets = {}
+    #     self.running = False
+    #     self.update_thread = None
+    #     self._initialize_assets()        
     
     def _get_default_config(self):
         """Get default configuration for fictitious assets."""
@@ -111,8 +133,51 @@ class PriceService:
             except Exception as e:
                 logger.error(f"Error in price update loop: {e}")
                 time.sleep(1)  # Brief pause before retry
-    
+
     def _update_prices(self):
+        if self.use_loaded_policy:
+            self._update_prices_trained_policy()
+        else:
+            self._update_prices_normal()
+
+
+    def _update_prices_trained_policy(self):
+        """Update all asset prices using random walk."""
+        timestamp = time.time() * 1000  # JavaScript-compatible timestamp
+        
+        # Round timestamp to nearest second to avoid sub-second duplicates
+        timestamp = int(timestamp / 1000) * 1000
+        
+        for _, data in self.assets.items():
+            # Skip if this timestamp already exists for this symbol
+            if (data.get('last_update') == timestamp or
+                (len(data['history']) > 0 and data['history'][-1]['time'] == timestamp)):
+                continue
+
+            a, _, _ = self.reloaded_policy.act(self.s)
+            self.s, _, _, _ = self.env.step(a * self._env_cfg.max_step)
+
+            d = float(np.clip(a, -self._env_cfg.max_step, self._env_cfg.max_step))
+            new_price = data['price'] * (1 + d)
+
+            # Ensure price doesn't go negative
+            data['price'] = max(new_price, 0.0)  # Prevent negative prices
+            data['last_update'] = timestamp
+            
+            # Add to history
+            price_record = {'time': timestamp, 'price': data['price']}
+            data['history'].append(price_record)
+            
+            # Trim history to maximum points
+            max_points = self.config.get('MAX_HISTORY_POINTS', 100)
+            if len(data['history']) > max_points:
+                data['history'] = data['history'][-max_points:]
+        
+        # Periodically save data (every 10 updates)
+        if int(timestamp / 1000) % 10 == 0:
+            self._save_price_data()                
+    
+    def _update_prices_normal(self):
         """Update all asset prices using random walk."""
         timestamp = time.time() * 1000  # JavaScript-compatible timestamp
         

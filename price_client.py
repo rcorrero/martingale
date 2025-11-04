@@ -7,6 +7,8 @@ import requests
 from typing import Dict, List, Optional, Any
 import logging
 
+from pricing.train_pricing import load_policy, load_env_config, MarketEnv
+
 logger = logging.getLogger(__name__)
 
 class PriceServiceClient:
@@ -21,7 +23,7 @@ class PriceServiceClient:
         """
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
-        self._session = requests.Session()
+        self._session = requests.Session()   
     
     def _make_request(self, endpoint: str, method: str = 'GET', **kwargs) -> Optional[Dict]:
         """Make a request to the price service.
@@ -147,7 +149,7 @@ class PriceServiceClient:
 class FallbackPriceService:
     """Fallback price service that generates prices locally if the API is unavailable."""
     
-    def __init__(self, assets_config: Dict[str, Dict[str, Any]]):
+    def __init__(self, assets_config: Dict[str, Dict[str, Any]], use_loaded_policy=True):
         """Initialize with asset configuration.
         
         Args:
@@ -161,6 +163,17 @@ class FallbackPriceService:
                 'history': [],
                 'last_update': None
             }
+        self.use_loaded_policy = use_loaded_policy
+        if self.use_loaded_policy:
+            self._env_cfg = load_env_config("pricing/env_config.json")
+            logger.info("Loaded environment config for PriceService")
+            self._env_cfg.T = 99999999
+            self.env = MarketEnv(self._env_cfg)  
+            self.s = self.env.reset()    
+            self.reloaded_policy, self.reloaded_ppo_cfg = load_policy(
+                "pricing/policy_weights.npz", state_dim=6, T=self._env_cfg.T
+            )        
+            logger.info("Loaded policy for PriceService")     
     
     def add_asset(self, symbol: str, initial_price: float, volatility: float = 0.02):
         """Add a new asset to the fallback service.
@@ -196,8 +209,47 @@ class FallbackPriceService:
             List of symbol strings
         """
         return list(self.assets.keys())
-    
+
     def update_prices(self):
+        if self.use_loaded_policy:
+            self._update_prices_trained_policy()
+        else:
+            self._update_prices_normal()    
+    
+    def _update_prices_trained_policy(self):
+        """Update prices using random walk (similar to original implementation)."""
+        import numpy as np
+        
+        timestamp = time.time() * 1000
+        # Round timestamp to nearest second to avoid sub-second duplicates
+        timestamp = int(timestamp / 1000) * 1000
+        
+        for _, data in self.assets.items():
+            # Skip if this timestamp already exists for this symbol
+            if (data.get('last_update') == timestamp or
+                (len(data['history']) > 0 and data['history'][-1]['time'] == timestamp)):
+                continue
+
+            a, _, _ = self.reloaded_policy.act(self.s)
+            self.s, _, _, _ = self.env.step(a * self._env_cfg.max_step)
+
+            d = float(np.clip(a, -self._env_cfg.max_step, self._env_cfg.max_step))
+            new_price = data['price'] * (1 + d)
+
+            # Ensure price doesn't go negative
+            data['price'] = max(new_price, 0.0)  # Prevent negative prices            
+
+            data['last_update'] = timestamp
+            
+            # Add to history
+            price_record = {'time': timestamp, 'price': data['price']}
+            data['history'].append(price_record)
+            
+            # Keep only last 100 points
+            if len(data['history']) > 100:
+                data['history'].pop(0)    
+    
+    def _update_prices_normal(self):
         """Update prices using random walk (similar to original implementation)."""
         import numpy as np
         
@@ -210,7 +262,6 @@ class FallbackPriceService:
             if (data.get('last_update') == timestamp or
                 (len(data['history']) > 0 and data['history'][-1]['time'] == timestamp)):
                 continue
-                
             change_percent = np.random.normal(0, data['volatility'])
             # std_dev = np.sqrt(data['volatility'])
             # change_percent = np.random.lognormal(-data['volatility']/2, std_dev)
