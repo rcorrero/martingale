@@ -1,5 +1,4 @@
 /* Trading Terminal Theme */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
 :root {
     /* Professional Dark Theme Palette */
     --terminal-bg: #010101;                    /* Anchor black */
