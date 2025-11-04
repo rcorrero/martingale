@@ -676,6 +676,55 @@ document.addEventListener('DOMContentLoaded', () => {
         return String(userId);
     }
 
+    function normalizePortfolioHistory(points, limit = PORTFOLIO_HISTORY_LIMIT) {
+        if (!Array.isArray(points) || !points.length) {
+            return [];
+        }
+
+        const sanitized = [];
+        for (const raw of points) {
+            const rawTime = raw?.time ?? raw?.timestamp ?? raw?.x ?? null;
+            const rawValue = raw?.value ?? raw?.portfolio_value ?? raw?.y ?? null;
+            const time = Number(rawTime);
+            const value = Number(rawValue);
+
+            if (!Number.isFinite(time) || !Number.isFinite(value)) {
+                continue;
+            }
+
+            sanitized.push({ x: time, y: value });
+        }
+
+        if (!sanitized.length) {
+            return [];
+        }
+
+        sanitized.sort((a, b) => a.x - b.x);
+
+        const deduped = [];
+        let lastX = -Infinity;
+
+        for (const point of sanitized) {
+            if (point.x === lastX && deduped.length) {
+                deduped[deduped.length - 1] = point;
+                continue;
+            }
+
+            if (point.x < lastX) {
+                continue;
+            }
+
+            deduped.push(point);
+            lastX = point.x;
+        }
+
+        if (deduped.length > limit) {
+            return deduped.slice(deduped.length - limit);
+        }
+
+        return deduped;
+    }
+
     function updatePortfolioHistoryLatestLabel(latestValue = null) {
         if (!portfolioValueLatestEl) {
             return;
@@ -829,12 +878,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     backgroundColor: gradient,
                     fill: 'origin',
                     tension: 0.2,
+                    cubicInterpolationMode: 'monotone',
                     pointRadius: 0,
                     pointHoverRadius: 5,
                     pointHoverBorderWidth: 2,
                     pointHoverBorderColor: '#0a0e1a',
                     pointHoverBackgroundColor: accent,
-                    spanGaps: true
+                    spanGaps: true,
+                    normalized: true
                 }]
             },
             options: getPortfolioHistoryChartOptions()
@@ -881,15 +932,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                portfolioHistoryData = data.points
-                    .map(point => ({
-                        x: Number(point.time),
-                        y: Number(point.value)
-                    }))
-                    .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
-
-                // Ensure data sorted chronologically
-                portfolioHistoryData.sort((a, b) => a.x - b.x);
+                portfolioHistoryData = normalizePortfolioHistory(data.points, limit);
 
                 updatePortfolioValueChart();
                 updatePortfolioHistoryLatestLabel();
@@ -1839,16 +1882,27 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(response => response.json())
             .then(historyData => {
                 const history = historyData[symbol] || [];
-                
-                // Filter out invalid data points and sort by timestamp
-                const validHistory = history
-                    .filter(point => point.time && point.price && 
-                           typeof point.time === 'number' && 
-                           typeof point.price === 'number' &&
-                           !isNaN(point.time) && !isNaN(point.price))
-                    .sort((a, b) => a.time - b.time)
-                    .map(point => ({x: point.time, y: point.price})); // Transform to Chart.js format
-                
+
+                const sortedHistory = [...history].sort((a, b) => Number(a.time) - Number(b.time));
+                const validHistory = [];
+                let lastX = null;
+
+                for (const point of sortedHistory) {
+                    const time = Number(point?.time);
+                    const price = Number(point?.price);
+                    if (!Number.isFinite(time) || !Number.isFinite(price)) {
+                        continue;
+                    }
+
+                    const formattedPoint = { x: time, y: price };
+                    if (lastX !== null && time === lastX && validHistory.length) {
+                        validHistory[validHistory.length - 1] = formattedPoint;
+                    } else {
+                        validHistory.push(formattedPoint);
+                    }
+                    lastX = time;
+                }
+
                 const assetData = availableAssetDetails[symbol] || null;
                 const color = getInstrumentColor(symbol, assetData);
                 
@@ -1859,6 +1913,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     backgroundColor: hexToRgba(color, 0.18),
                     fill: 'origin',
                     tension: 0.25,
+                    cubicInterpolationMode: 'monotone',
                     borderWidth: 2,
                     pointRadius: 0,
                     pointHoverRadius: 6,
@@ -1866,7 +1921,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     pointHoverBorderColor: '#0a0e1a',
                     pointHoverBorderWidth: 2,
                     stepped: false, // Ensure smooth line connections, not stepped
-                    spanGaps: false // Don't connect across missing data points
+                    spanGaps: false, // Don't connect across missing data points
+                    normalized: true
                 };
 
                 chartInstance.chart.data.datasets.push(dataset);
@@ -1998,9 +2054,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         // Add new data point
                         dataset.data.push(newDataPoint);
-                        // Keep only last 100 points
-                        if (dataset.data.length > 100) {
-                            dataset.data.shift();
+                        const needsResort = dataset.data.length > 1 && dataset.data[dataset.data.length - 1].x < dataset.data[dataset.data.length - 2].x;
+                        if (needsResort) {
+                            dataset.data.sort((a, b) => a.x - b.x);
+                        }
+                        const excess = dataset.data.length - 100;
+                        if (excess > 0) {
+                            dataset.data.splice(0, excess);
                         }
                     }
                     chartInstance.chart.update('none');
