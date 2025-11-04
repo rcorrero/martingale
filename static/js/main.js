@@ -1528,7 +1528,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Update portfolio value
                 portfolioValueEl.textContent = formatCurrencyLocale(performance.portfolio_value);
-                updatePortfolioHistoryLatestLabel(performance.portfolio_value);
+                if (!portfolioHistoryData.length) {
+                    updatePortfolioHistoryLatestLabel(performance.portfolio_value);
+                }
                 
                 // Update total P&L with color coding
                 totalPnlEl.textContent = formatCurrencyLocale(performance.total_pnl);
@@ -1570,7 +1572,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Error fetching performance data
                 // Set fallback values to prevent NaN display
                 portfolioValueEl.textContent = formatCurrencyLocale(100000);
-                updatePortfolioHistoryLatestLabel(100000);
+                if (!portfolioHistoryData.length) {
+                    updatePortfolioHistoryLatestLabel(100000);
+                }
                 totalPnlEl.textContent = formatCurrencyLocale(0);
                 totalReturnEl.textContent = formatPercentage(0);
                 realizedPnlEl.textContent = formatCurrencyLocale(0);
