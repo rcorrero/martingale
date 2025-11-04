@@ -19,6 +19,12 @@ venv.bak/
 # Flask instance folder
 instance/
 
+# Pricing model
+pricing/
+
+# Notebooks
+notebooks/
+
 # User data files
 users.json
 portfolios.json
