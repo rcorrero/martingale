@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let userPortfolio = {};
     let currentUserId = null; // Store current user ID for filtering
     let portfolioPieChart = null;
+    let mobilePortfolioPieChart = null;
     let previousPrices = {}; // Track previous prices for color comparison
     let openInterestData = {}; // Store open interest data for all assets
     let currentlyHighlightedSymbol = null; // Track currently highlighted holding
@@ -50,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const GLOBAL_TRANSACTIONS_LIMIT = 100;
     const PORTFOLIO_HISTORY_LIMIT = 300;
     let portfolioValueChart = null;
+    let mobilePortfolioChart = null;
     let portfolioHistoryData = [];
     let portfolioHistoryRefreshTimer = null;
     let portfolioHistoryRequest = null;
@@ -187,7 +189,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const createOrUpdatePortfoliePieChart = function() {
         const canvas = document.getElementById('portfolio-pie-chart');
-        if (!canvas) return;
+        const mobileCanvas = document.getElementById('mobile-portfolio-pie-chart');
+        
+        if (!canvas && !mobileCanvas) return;
 
         // Calculate portfolio values for the pie chart
         const portfolioData = [];
@@ -237,147 +241,167 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Only show chart if there's data
                     if (portfolioData.length === 0) {
-                        // Hide chart if no data
-                        canvas.style.display = 'none';
+                        // Hide charts if no data
+                        if (canvas) canvas.style.display = 'none';
+                        if (mobileCanvas) mobileCanvas.style.display = 'none';
                         return;
                     } else {
-                        canvas.style.display = 'block';
+                        if (canvas) canvas.style.display = 'block';
+                        if (mobileCanvas) mobileCanvas.style.display = 'block';
                     }
 
-                    if (!portfolioPieChart) {
-                        // Create new chart
-                        const ctx = canvas.getContext('2d');
-                        portfolioPieChart = new Chart(ctx, {
-                            type: 'doughnut',
-                            data: {
-                                labels: portfolioLabels,
-                                datasets: [{
-                                    data: portfolioData,
-                                    backgroundColor: portfolioColors,
-                                    borderColor: '#2d3748',
-                                    borderWidth: 2,
-                                    hoverBorderWidth: 4,
-                                    hoverBorderColor: themeAccentColor,
-                                    hoverBackgroundColor: themeAccentColor,
-                                    hoverOffset: 0
-                                }]
+                    // Chart configuration object
+                    const chartConfig = {
+                        type: 'doughnut',
+                        data: {
+                            labels: portfolioLabels,
+                            datasets: [{
+                                data: portfolioData,
+                                backgroundColor: portfolioColors,
+                                borderColor: '#2d3748',
+                                borderWidth: 2,
+                                hoverBorderWidth: 4,
+                                hoverBorderColor: themeAccentColor,
+                                hoverBackgroundColor: themeAccentColor,
+                                hoverOffset: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            cutout: '50%',
+                            layout: {
+                                padding: 10
                             },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: true,
-                                cutout: '50%',
-                                layout: {
-                                    padding: 10
+                            plugins: {
+                                legend: {
+                                    display: false
                                 },
-                                plugins: {
-                                    legend: {
-                                        display: false
-                                    },
-                                    tooltip: {
-                                        enabled: true,
-                                        mode: 'nearest',
-                                        intersect: true,
-                                        backgroundColor: 'rgba(10, 14, 26, 0.95)',
-                                        titleColor: themeAccentColor,
-                                        bodyColor: '#e2e8f0',
-                                        borderColor: '#2d3748',
-                                        borderWidth: 1,
-                                        cornerRadius: 6,
-                                        displayColors: false,
-                                        titleFont: {
-                                            family: 'JetBrains Mono, Consolas, Monaco, monospace',
-                                            size: 12,
-                                            weight: 600
-                                        },
-                                        bodyFont: {
-                                            family: 'JetBrains Mono, Consolas, Monaco, monospace',
-                                            size: 11
-                                        },
-                                        padding: 10,
-                                        caretSize: 6,
-                                        callbacks: {
-                                            title: function() {
-                                                return ''; // No title
-                                            },
-                                            label: function(context) {
-                                                const value = context.parsed;
-                                                const ticker = context.label;
-                                                
-                                                // Calculate total from the dataset
-                                                const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
-                                                const percentage = formatNumber(((value / total) * 100), 1);
-                                                
-                                                return [
-                                                    `${ticker}: ${percentage}%`,
-                                                    `Value: ${formatCurrencyLocale(value)}`
-                                                ];
-                                            }
-                                        }
-                                    }
-                                },
-                                interaction: {
+                                tooltip: {
+                                    enabled: true,
                                     mode: 'nearest',
-                                    intersect: true
-                                },
-                                onHover: (event, activeElements) => {
-                                    event.native.target.style.cursor = activeElements.length > 0 ? 'pointer' : 'default';
-                                    
-                                    // Cross-highlighting: highlight corresponding holdings list item
-                                    if (activeElements.length > 0) {
-                                        const activeElement = activeElements[0];
-                                        const label = portfolioPieChart.data.labels[activeElement.index];
-                                        
-                                        // Only update if the highlighted symbol changed
-                                        if (currentlyHighlightedSymbol !== label) {
-                                            currentlyHighlightedSymbol = label;
-                                            clearHoldingsHighlight(true);
-                                            highlightHoldingsItem(label);
+                                    intersect: true,
+                                    backgroundColor: 'rgba(10, 14, 26, 0.95)',
+                                    titleColor: themeAccentColor,
+                                    bodyColor: '#e2e8f0',
+                                    borderColor: '#2d3748',
+                                    borderWidth: 1,
+                                    cornerRadius: 6,
+                                    displayColors: false,
+                                    titleFont: {
+                                        family: 'JetBrains Mono, Consolas, Monaco, monospace',
+                                        size: 12,
+                                        weight: 600
+                                    },
+                                    bodyFont: {
+                                        family: 'JetBrains Mono, Consolas, Monaco, monospace',
+                                        size: 11
+                                    },
+                                    padding: 10,
+                                    caretSize: 6,
+                                    callbacks: {
+                                        title: function() {
+                                            return ''; // No title
+                                        },
+                                        label: function(context) {
+                                            const value = context.parsed;
+                                            const ticker = context.label;
+                                            
+                                            // Calculate total from the dataset
+                                            const total = context.dataset.data.reduce((sum, val) => sum + val, 0);
+                                            const percentage = formatNumber(((value / total) * 100), 1);
+                                            
+                                            return [
+                                                `${ticker}: ${percentage}%`,
+                                                `Value: ${formatCurrencyLocale(value)}`
+                                            ];
                                         }
-                                    } else {
-                                        // Only clear if something was highlighted
-                                        clearAllCrossHighlights();
                                     }
-                                },
-                                onLeave: () => {
-                                    clearAllCrossHighlights();
-                                },
-                                elements: {
-                                    arc: {
-                                        borderWidth: 2
-                                    }
-                                },
-                                animation: {
-                                    animateRotate: true,
-                                    duration: 1000
                                 }
+                            },
+                            interaction: {
+                                mode: 'nearest',
+                                intersect: true
+                            },
+                            onHover: (event, activeElements) => {
+                                event.native.target.style.cursor = activeElements.length > 0 ? 'pointer' : 'default';
+                                
+                                // Cross-highlighting: highlight corresponding holdings list item
+                                if (activeElements.length > 0) {
+                                    const activeElement = activeElements[0];
+                                    const label = event.chart.data.labels[activeElement.index];
+                                    
+                                    // Only update if the highlighted symbol changed
+                                    if (currentlyHighlightedSymbol !== label) {
+                                        currentlyHighlightedSymbol = label;
+                                        clearHoldingsHighlight(true);
+                                        highlightHoldingsItem(label);
+                                    }
+                                } else {
+                                    // Only clear if something was highlighted
+                                    clearAllCrossHighlights();
+                                }
+                            },
+                            onLeave: () => {
+                                clearAllCrossHighlights();
+                            },
+                            elements: {
+                                arc: {
+                                    borderWidth: 2
+                                }
+                            },
+                            animation: {
+                                animateRotate: true,
+                                duration: 1000
                             }
-                        });
-                    } else {
-                        clearAllCrossHighlights();
-                        // Update existing chart
-                        portfolioPieChart.data.labels = portfolioLabels;
-                        portfolioPieChart.data.datasets[0].data = portfolioData;
-                        portfolioPieChart.data.datasets[0].backgroundColor = portfolioColors;
-                        portfolioPieChart.data.datasets[0].hoverOffset = 0;
-                        portfolioPieChart.update();
+                        }
+                    };
+
+                    // Create or update desktop chart
+                    if (canvas) {
+                        if (!portfolioPieChart) {
+                            const ctx = canvas.getContext('2d');
+                            portfolioPieChart = new Chart(ctx, chartConfig);
+                        } else {
+                            clearAllCrossHighlights();
+                            portfolioPieChart.data.labels = portfolioLabels;
+                            portfolioPieChart.data.datasets[0].data = portfolioData;
+                            portfolioPieChart.data.datasets[0].backgroundColor = portfolioColors;
+                            portfolioPieChart.data.datasets[0].hoverOffset = 0;
+                            portfolioPieChart.update();
+                        }
+                        
+                        // Ensure chart hover state clears when pointer leaves canvas
+                        if (!canvas.dataset.hoverExitBound) {
+                            const handleChartHoverExit = () => {
+                                clearAllCrossHighlights();
+                            };
+
+                            canvas.addEventListener('mouseleave', handleChartHoverExit);
+                            canvas.addEventListener('pointerleave', handleChartHoverExit);
+                            canvas.addEventListener('mouseout', handleChartHoverExit);
+                            canvas.addEventListener('touchend', handleChartHoverExit);
+                            canvas.addEventListener('touchcancel', handleChartHoverExit);
+                            canvas.dataset.hoverExitBound = 'true';
+                        }
+                    }
+                    
+                    // Create or update mobile chart
+                    if (mobileCanvas) {
+                        if (!mobilePortfolioPieChart) {
+                            const ctx = mobileCanvas.getContext('2d');
+                            mobilePortfolioPieChart = new Chart(ctx, chartConfig);
+                        } else {
+                            mobilePortfolioPieChart.data.labels = portfolioLabels;
+                            mobilePortfolioPieChart.data.datasets[0].data = portfolioData;
+                            mobilePortfolioPieChart.data.datasets[0].backgroundColor = portfolioColors;
+                            mobilePortfolioPieChart.data.datasets[0].hoverOffset = 0;
+                            mobilePortfolioPieChart.update();
+                        }
                     }
                     
                     // Update holdings list with cross-highlighting capabilities
                     updateHoldingsCrossHighlighting();
-
-                    // Ensure chart hover state clears when pointer leaves canvas (covers rapid exits)
-                    if (!canvas.dataset.hoverExitBound) {
-                        const handleChartHoverExit = () => {
-                            clearAllCrossHighlights();
-                        };
-
-                        canvas.addEventListener('mouseleave', handleChartHoverExit);
-                        canvas.addEventListener('pointerleave', handleChartHoverExit);
-                        canvas.addEventListener('mouseout', handleChartHoverExit);
-                        canvas.addEventListener('touchend', handleChartHoverExit);
-                        canvas.addEventListener('touchcancel', handleChartHoverExit);
-                        canvas.dataset.hoverExitBound = 'true';
-                    }
                 })
                 .catch(error => {
                     // Error fetching assets for pie chart
@@ -935,6 +959,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 portfolioHistoryData = normalizePortfolioHistory(data.points, limit);
 
                 updatePortfolioValueChart();
+                updateMobilePortfolioChart();
                 updatePortfolioHistoryLatestLabel();
             })
             .catch(error => {
@@ -1261,6 +1286,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const now = Date.now();
 
         Object.entries(userPortfolio.holdings).forEach(([symbol, quantity]) => {
+            // Skip CASH - it's not an asset and never expires
+            if (symbol.toUpperCase() === 'CASH') {
+                return;
+            }
+            
             if (quantity <= 0) {
                 return;
             }
@@ -1339,6 +1369,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const row = createTransactionRow(transaction);
             transactionsTableBody.appendChild(row);
         });
+        
+        // Update mobile transactions
+        if (isMobileView()) {
+            updateMobileTransactions(sortedTransactions);
+        }
     }
 
     function updateAllTransactionsTable() {
@@ -1420,6 +1455,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     : [];
 
                 updateLeaderboardTable();
+                
+                // Update mobile leaderboard
+                if (isMobileView()) {
+                    updateMobileLeaderboard(leaderboardEntries);
+                }
             })
             .catch(error => {
                 console.error('Error refreshing leaderboard:', error);
@@ -2080,12 +2120,73 @@ document.addEventListener('DOMContentLoaded', () => {
     // Global function for removing symbols (called from onclick)
     window.removeSymbolFromChart = removeSymbolFromChart;
 
+    // Helper function to detect mobile view
+    function isMobileView() {
+        return window.innerWidth <= 768;
+    }
+
     // Function to handle symbol badge clicks - puts symbol in trade input
     function handleSymbolBadgeClick(symbol) {
+        // Special handling for CASH
+        if (symbol.toUpperCase() === 'CASH') {
+            showNotification(
+                'CASH represents your available balance to purchase assets with.',
+                'info'
+            );
+            return;
+        }
+        
         const assetInput = document.getElementById('asset-input');
         if (assetInput) {
             assetInput.value = symbol.toUpperCase();
             assetInput.dispatchEvent(new Event('input'));
+        }
+    }
+
+    // Function to handle mobile symbol badge clicks - navigates to asset
+    function handleMobileSymbolBadgeClick(symbol) {
+        // Special handling for CASH
+        if (symbol.toUpperCase() === 'CASH') {
+            showNotification(
+                'CASH represents your available balance to purchase assets with.',
+                'info'
+            );
+            return;
+        }
+        
+        // Find the asset index
+        const assetIndex = mobileAssets.findIndex(asset => asset.symbol === symbol);
+        
+        if (assetIndex !== -1) {
+            // Asset exists - switch to assets tab and navigate to it
+            const mobileTabs = document.querySelectorAll('.mobile-tab');
+            const assetsTab = Array.from(mobileTabs).find(tab => tab.dataset.page === 'assets');
+            
+            if (assetsTab) {
+                // Update active tab
+                mobileTabs.forEach(t => t.classList.remove('active'));
+                assetsTab.classList.add('active');
+                
+                // Show carousel, hide pages
+                const mobileCarousel = document.getElementById('mobile-carousel');
+                const mobilePages = document.querySelectorAll('.mobile-page');
+                
+                if (mobileCarousel) {
+                    mobileCarousel.style.display = 'block';
+                }
+                
+                mobilePages.forEach(p => p.classList.remove('active'));
+                
+                // Navigate to the asset
+                currentMobileAssetIndex = assetIndex;
+                updateMobileAssetDisplay();
+            }
+        } else {
+            // Asset not found - likely expired
+            showNotification(
+                `Asset ${symbol} has expired and is no longer available for trading.`,
+                'info'
+            );
         }
     }
 
@@ -2095,7 +2196,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.addEventListener('click', function(e) {
             if (e.target.classList.contains('symbol-badge')) {
                 const symbol = e.target.textContent.trim();
-                handleSymbolBadgeClick(symbol);
+                
+                // Check if mobile view - different behavior
+                if (isMobileView()) {
+                    handleMobileSymbolBadgeClick(symbol);
+                } else {
+                    handleSymbolBadgeClick(symbol);
+                }
             }
         });
     }    function updateVWAPLine(symbol) {
@@ -2176,6 +2283,11 @@ document.addEventListener('DOMContentLoaded', () => {
         refreshLeaderboard();
         refreshPortfolioHistory();
         
+        // Update mobile transactions
+        if (isMobileView()) {
+            updateMobileTransactions(userTransactions);
+        }
+        
         // Update VWAP lines for all charts after portfolio is loaded
         Object.keys(charts).forEach(symbol => {
             updateVWAPLine(symbol);
@@ -2204,12 +2316,40 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update pie chart with new portfolio values
         createOrUpdatePortfoliePieChart();
         schedulePortfolioHistoryRefresh(1500);
+        
+        // Update mobile view
+        if (isMobileView()) {
+            updateMobileAccountInfo();
+            updateMobilePrices(assets);
+            updateMobileExpiry(Object.values(assets), true); // Force update with fresh server data
+        }
     });
 
     function updateAssetsTable(assets) {
         latestAssetsSnapshot = assets;
         evaluateExpiringHoldings(assets);
         latestAssetPrices = {};
+        
+        // Update mobile view - only rebuild cards if asset list has changed
+        if (isMobileView()) {
+            const assetArray = Object.entries(assets).map(([symbol, data]) => ({
+                symbol: symbol,
+                price: data.price,
+                color: data.color,
+                expires_in: data.time_to_expiry_seconds || 0
+            })).sort((a, b) => a.symbol.localeCompare(b.symbol));
+            
+            // Check if we need to rebuild cards (asset list changed)
+            const currentSymbols = mobileAssets.map(a => a.symbol).sort().join(',');
+            const newSymbols = assetArray.map(a => a.symbol).sort().join(',');
+            
+            if (currentSymbols !== newSymbols) {
+                // Asset list changed, rebuild cards
+                updateMobileAssets(assetArray);
+            }
+            // Note: price and expiry updates are handled separately by updateMobilePrices() and updateMobileExpiry()
+        }
+        
         // Fetch current open interest data
         fetch('/api/open-interest')
             .then(response => response.json())
@@ -2386,6 +2526,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         
                         holdingsList.innerHTML = '';
                         
+                        // Get mobile holdings list if it exists
+                        const mobileHoldingsList = document.getElementById('mobile-holdings-list');
+                        if (mobileHoldingsList) {
+                            mobileHoldingsList.innerHTML = '';
+                        }
+                        
                         // Add cash as the first item in holdings list
                         const cashColor = '#00d4ff'; // Cash color for consistency
                         const cashFormatted = formatNumber(portfolio.cash, 2);
@@ -2396,6 +2542,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </li>`;
                         holdingsList.innerHTML += cashItem;
+                        if (mobileHoldingsList) {
+                            mobileHoldingsList.innerHTML += cashItem;
+                        }
                         
                         // Add asset holdings
                         for (const symbol in portfolio.holdings) {
@@ -2432,6 +2581,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                     </div>
                                 </li>`;
                                 holdingsList.innerHTML += item;
+                                if (mobileHoldingsList) {
+                                    mobileHoldingsList.innerHTML += item;
+                                }
                             }
                         }
                         
@@ -2462,6 +2614,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Update pie chart
         createOrUpdatePortfoliePieChart();
+        
+        // Update mobile sell button state if on mobile view
+        if (isMobileView() && mobileSellBtn && mobileAssets[currentMobileAssetIndex]) {
+            const currentSymbol = mobileAssets[currentMobileAssetIndex].symbol;
+            const hasPosition = userPortfolio.holdings && userPortfolio.holdings[currentSymbol] > 0;
+            mobileSellBtn.disabled = !hasPosition;
+            mobileSellBtn.style.opacity = hasPosition ? '1' : '0.5';
+        }
         
         // Update assets table with new open interest data
         fetch('/api/assets')
@@ -2758,21 +2918,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Display trade confirmation messages
     socket.on('trade_confirmation', (data) => {
-        tradeMessage.textContent = data.message;
-        if (data.success) {
-            tradeMessage.style.color = '#7dda58'; // High contrast green
-            tradeMessage.style.background = 'rgba(125, 218, 88, 0.1)';
-            tradeMessage.style.border = '1px solid rgba(125, 218, 88, 0.3)';
-        } else {
-            tradeMessage.style.color = '#f85149'; // High contrast red
-            tradeMessage.style.background = 'rgba(248, 81, 73, 0.1)';
-            tradeMessage.style.border = '1px solid rgba(248, 81, 73, 0.3)';
+        // Show mobile toast notification instead of desktop message on mobile
+        if (isMobileView()) {
+            // Format the message with proper locale formatting for quantity
+            let message = data.message;
+            if (data.success && data.quantity && data.symbol) {
+                const formattedQty = formatQuantity(data.quantity);
+                const action = data.type === 'buy' ? 'Bought' : 'Sold';
+                message = `${action} ${formattedQty} ${data.symbol}`;
+            }
+            
+            // Use unified notification system
+            showNotification(message, data.success ? 'success' : 'error');
+        } else if (tradeMessage) {
+            // Desktop message - only update if element exists
+            tradeMessage.textContent = data.message;
+            if (data.success) {
+                tradeMessage.style.color = '#7dda58'; // High contrast green
+                tradeMessage.style.background = 'rgba(125, 218, 88, 0.1)';
+                tradeMessage.style.border = '1px solid rgba(125, 218, 88, 0.3)';
+            } else {
+                tradeMessage.style.color = '#f85149'; // High contrast red
+                tradeMessage.style.background = 'rgba(248, 81, 73, 0.1)';
+                tradeMessage.style.border = '1px solid rgba(248, 81, 73, 0.3)';
+            }
+            setTimeout(() => {
+                if (tradeMessage) {
+                    tradeMessage.textContent = '';
+                    tradeMessage.style.background = '';
+                    tradeMessage.style.border = '';
+                }
+            }, 3000);
         }
-        setTimeout(() => {
-            tradeMessage.textContent = '';
-            tradeMessage.style.background = '';
-            tradeMessage.style.border = '';
-        }, 3000);
     });
 
     // Initialize time display
@@ -2837,4 +3014,1002 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial leaderboard load
     refreshLeaderboard();
+
+    // ============================================
+    // MOBILE VIEW FUNCTIONALITY
+    // ============================================
+
+    let mobileAssets = [];
+    let currentMobileAssetIndex = 0;
+    let mobileCharts = [];
+    let touchStartY = 0;
+    let touchEndY = 0;
+    let isSwiping = false;
+    let wheelTimeout = null;
+    let wheelDeltaY = 0;
+    let mobilePreviousPrices = {}; // Track price changes for color coding
+    let mobileExpiryTimestamps = {}; // Track expiry timestamps for real-time countdown
+
+    const mobileCarousel = document.getElementById('mobile-carousel');
+    const mobilePortfolioValueEl = document.getElementById('mobile-portfolio-value');
+    const mobileCashBalanceEl = document.getElementById('mobile-cash-balance');
+    const mobileBuyBtn = document.getElementById('mobile-buy-btn');
+    const mobileSellBtn = document.getElementById('mobile-sell-btn');
+    const mobileSellAllBtn = document.getElementById('mobile-sell-all-btn');
+    const mobileQuantityModal = document.getElementById('mobile-quantity-modal');
+    const mobileQuantityInput = document.getElementById('mobile-quantity-input');
+    const mobileQuantityTitle = document.getElementById('mobile-quantity-title');
+    const mobileQuantityCancel = document.getElementById('mobile-quantity-cancel');
+    const mobileQuantityConfirm = document.getElementById('mobile-quantity-confirm');
+
+    let pendingMobileTrade = null;
+
+    function initMobileView() {
+        if (!isMobileView()) return;
+
+        // Set up tab navigation
+        const mobileTabs = document.querySelectorAll('.mobile-tab');
+        const mobilePages = document.querySelectorAll('.mobile-page');
+
+        mobileTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const pageName = tab.dataset.page;
+                
+                // Update active tab
+                mobileTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Show/hide pages and carousel
+                if (pageName === 'assets') {
+                    mobileCarousel.style.display = 'block';
+                    mobilePages.forEach(p => p.classList.remove('active'));
+                } else {
+                    mobileCarousel.style.display = 'none';
+                    mobilePages.forEach(p => {
+                        if (p.id === `mobile-page-${pageName}`) {
+                            p.classList.add('active');
+                        } else {
+                            p.classList.remove('active');
+                        }
+                    });
+                }
+            });
+        });
+
+        // Set up touch handlers
+        if (mobileCarousel) {
+            mobileCarousel.addEventListener('touchstart', handleMobileTouchStart, { passive: true });
+            mobileCarousel.addEventListener('touchmove', handleMobileTouchMove, { passive: false });
+            mobileCarousel.addEventListener('touchend', handleMobileTouchEnd, { passive: true });
+            
+            // Set up wheel handler for trackpad/mouse wheel gestures
+            mobileCarousel.addEventListener('wheel', handleMobileWheel, { passive: false });
+        }
+
+        // Set up trade buttons
+        if (mobileBuyBtn) {
+            mobileBuyBtn.addEventListener('click', () => handleMobileTrade('buy'));
+        }
+
+        if (mobileSellBtn) {
+            mobileSellBtn.addEventListener('click', () => handleMobileTrade('sell'));
+        }
+
+        if (mobileSellAllBtn) {
+            mobileSellAllBtn.addEventListener('click', handleMobileSellAll);
+        }
+
+        // Set up quantity modal
+        if (mobileQuantityCancel) {
+            mobileQuantityCancel.addEventListener('click', () => {
+                mobileQuantityModal.classList.remove('active');
+                pendingMobileTrade = null;
+            });
+        }
+
+        if (mobileQuantityConfirm) {
+            mobileQuantityConfirm.addEventListener('click', confirmMobileTrade);
+        }
+
+        // Set up mobile asset search
+        const mobileAssetSearch = document.getElementById('mobile-asset-search');
+        if (mobileAssetSearch) {
+            mobileAssetSearch.addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase().trim();
+                if (!searchTerm) {
+                    // Show current asset if search is cleared
+                    return;
+                }
+                
+                // Find matching asset
+                const matchIndex = mobileAssets.findIndex(asset => 
+                    asset.symbol.toLowerCase().includes(searchTerm)
+                );
+                
+                if (matchIndex !== -1 && matchIndex !== currentMobileAssetIndex) {
+                    currentMobileAssetIndex = matchIndex;
+                    updateMobileAssetDisplay();
+                }
+            });
+        }
+
+        // Initialize mobile data
+        updateMobileAccountInfo();
+        
+        // Start real-time expiry countdown updates for mobile view
+        setInterval(() => {
+            if (isMobileView()) {
+                updateMobileExpiryCountdown();
+            }
+        }, 1000);
+    }
+
+    function handleMobileTouchStart(e) {
+        touchStartY = e.touches[0].clientY;
+        isSwiping = false;
+    }
+
+    function handleMobileTouchMove(e) {
+        if (!touchStartY) return;
+        
+        touchEndY = e.touches[0].clientY;
+        const diff = touchStartY - touchEndY;
+
+        // Prevent default scrolling during swipe
+        if (Math.abs(diff) > 10) {
+            e.preventDefault();
+            isSwiping = true;
+        }
+    }
+
+    function handleMobileTouchEnd(e) {
+        if (!isSwiping) {
+            touchStartY = 0;
+            touchEndY = 0;
+            return;
+        }
+
+        const diff = touchStartY - touchEndY;
+        const threshold = 50; // Minimum swipe distance
+
+        if (Math.abs(diff) > threshold) {
+            if (diff > 0) {
+                // Swiped up - go to next asset
+                navigateMobileAsset(1);
+            } else {
+                // Swiped down - go to previous asset
+                navigateMobileAsset(-1);
+            }
+        }
+
+        touchStartY = 0;
+        touchEndY = 0;
+        isSwiping = false;
+    }
+
+    function handleMobileWheel(e) {
+        // Only handle wheel events when on the assets tab
+        const assetsTab = document.querySelector('.mobile-tab[data-page="assets"]');
+        if (!assetsTab || !assetsTab.classList.contains('active')) {
+            return;
+        }
+
+        e.preventDefault();
+        
+        // Accumulate wheel delta
+        wheelDeltaY += e.deltaY;
+        
+        // Clear existing timeout
+        if (wheelTimeout) {
+            clearTimeout(wheelTimeout);
+        }
+        
+        // Set a short timeout to debounce rapid wheel events
+        wheelTimeout = setTimeout(() => {
+            const threshold = 100; // Minimum accumulated delta to trigger navigation
+            
+            if (Math.abs(wheelDeltaY) > threshold) {
+                if (wheelDeltaY > 0) {
+                    // Scrolled down - go to next asset
+                    navigateMobileAsset(1);
+                } else {
+                    // Scrolled up - go to previous asset
+                    navigateMobileAsset(-1);
+                }
+            }
+            
+            // Reset accumulator
+            wheelDeltaY = 0;
+        }, 150); // Wait 150ms after last wheel event
+    }
+
+    function navigateMobileAsset(direction) {
+        if (mobileAssets.length === 0) return;
+
+        const newIndex = currentMobileAssetIndex + direction;
+        
+        if (newIndex < 0 || newIndex >= mobileAssets.length) {
+            return; // Don't wrap around
+        }
+
+        currentMobileAssetIndex = newIndex;
+        updateMobileAssetDisplay();
+    }
+
+    function createMobileAssetCard(asset, index) {
+        const card = document.createElement('div');
+        card.className = 'mobile-asset-card';
+        card.dataset.index = index;
+
+        const assetColor = getInstrumentColor(asset.symbol, asset);
+
+        // Calculate expiry text (styling will be applied by updateMobileExpiry)
+        let expiryText = 'Loading...';
+        if (asset.expires_in !== undefined) {
+            const seconds = Math.floor(asset.expires_in);
+            if (seconds < 60) {
+                expiryText = `Expires in ${seconds}s`;
+            } else if (seconds < 300) {
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                expiryText = hours > 0 ? `Expires in ${hours}h ${minutes}m` : `Expires in ${minutes}m`;
+            } else {
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                expiryText = hours > 0 ? `Expires in ${hours}h ${minutes}m` : `Expires in ${minutes}m`;
+            }
+        }
+
+        card.innerHTML = `
+            <div class="mobile-asset-header">
+                <div class="mobile-asset-symbol">${asset.symbol}</div>
+                <div class="mobile-asset-price" id="mobile-price-${asset.symbol}">$${asset.price ? asset.price.toFixed(2) : '0.00'}</div>
+                <div class="mobile-asset-expiry" id="mobile-expiry-${asset.symbol}">${expiryText}</div>
+            </div>
+            <div class="mobile-asset-chart">
+                <canvas id="mobile-chart-${asset.symbol}"></canvas>
+            </div>
+        `;
+
+        return card;
+    }
+
+    function updateMobileAssets(assets) {
+        if (!isMobileView() || !mobileCarousel) return;
+
+        // Store the currently displayed symbol before updating
+        const currentSymbol = mobileAssets[currentMobileAssetIndex]?.symbol;
+
+        mobileAssets = assets;
+
+        // Store search container if it exists
+        const searchContainer = mobileCarousel.querySelector('.mobile-asset-search-container');
+        
+        // Remove only the asset cards, not the search container
+        const cards = mobileCarousel.querySelectorAll('.mobile-asset-card');
+        cards.forEach(card => card.remove());
+        
+        // Clear charts
+        mobileCharts = [];
+
+        // Create cards for each asset
+        mobileAssets.forEach((asset, index) => {
+            const card = createMobileAssetCard(asset, index);
+            mobileCarousel.appendChild(card);
+
+            // Create chart for this asset
+            const canvas = card.querySelector(`#mobile-chart-${asset.symbol}`);
+            if (canvas) {
+                createMobileAssetChart(canvas, asset);
+            }
+        });
+
+        // Try to maintain the same symbol if it still exists
+        if (currentSymbol) {
+            const newIndex = mobileAssets.findIndex(a => a.symbol === currentSymbol);
+            if (newIndex !== -1) {
+                // Symbol still exists, stay on it
+                currentMobileAssetIndex = newIndex;
+            } else {
+                // Symbol no longer exists (expired), adjust index if needed
+                if (currentMobileAssetIndex >= mobileAssets.length) {
+                    currentMobileAssetIndex = Math.max(0, mobileAssets.length - 1);
+                }
+            }
+        } else {
+            // No previous symbol, reset to 0
+            currentMobileAssetIndex = 0;
+        }
+
+        // Initialize expiry timestamps and styling for all assets
+        updateMobileExpiry(mobileAssets, true);
+        
+        updateMobileAssetDisplay();
+    }
+
+    function updateMobileAssetDisplay() {
+        const cards = mobileCarousel.querySelectorAll('.mobile-asset-card');
+        
+        cards.forEach((card, index) => {
+            card.classList.remove('active', 'prev', 'next');
+            
+            if (index === currentMobileAssetIndex) {
+                card.classList.add('active');
+            } else if (index < currentMobileAssetIndex) {
+                card.classList.add('prev');
+            } else {
+                card.classList.add('next');
+            }
+        });
+
+        // Update sell button state
+        if (mobileSellBtn && mobileAssets[currentMobileAssetIndex]) {
+            const currentSymbol = mobileAssets[currentMobileAssetIndex].symbol;
+            const hasPosition = userPortfolio.holdings && userPortfolio.holdings[currentSymbol] > 0;
+            mobileSellBtn.disabled = !hasPosition;
+            mobileSellBtn.style.opacity = hasPosition ? '1' : '0.5';
+        }
+    }
+
+    function createMobileAssetChart(canvas, asset) {
+        const ctx = canvas.getContext('2d');
+        const assetColor = getInstrumentColor(asset.symbol, asset);
+
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: asset.symbol,
+                    data: [],
+                    borderColor: assetColor,
+                    backgroundColor: hexToRgba(assetColor, 0.1),
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'minute',
+                            displayFormats: {
+                                minute: 'HH:mm'
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(148, 163, 184, 0.1)',
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: {
+                                size: 10,
+                                family: 'JetBrains Mono'
+                            }
+                        }
+                    },
+                    y: {
+                        grid: {
+                            color: 'rgba(148, 163, 184, 0.1)',
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: {
+                                size: 10,
+                                family: 'JetBrains Mono'
+                            },
+                            callback: function(value) {
+                                return '$' + value.toFixed(2);
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(7, 8, 10, 0.95)',
+                        titleColor: '#f5f7fa',
+                        bodyColor: '#94a3b8',
+                        borderColor: assetColor,
+                        borderWidth: 1,
+                        padding: 12,
+                        displayColors: false,
+                        callbacks: {
+                            label: function(context) {
+                                return '$' + context.parsed.y.toFixed(2);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        mobileCharts.push({ symbol: asset.symbol, chart: chart });
+
+        // Load historical data with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+        fetch(`/api/assets/history?symbol=${asset.symbol}`, {
+            signal: controller.signal
+        })
+            .then(response => {
+                clearTimeout(timeoutId);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data && data[asset.symbol]) {
+                    const history = data[asset.symbol].map(point => ({
+                        x: new Date(point.time),
+                        y: point.price
+                    }));
+                    chart.data.datasets[0].data = history;
+                    chart.update('none');
+                }
+            })
+            .catch(error => {
+                clearTimeout(timeoutId);
+                // Silently ignore abort errors and network errors (timeout/fetch failures)
+                // AbortError: timeout triggered
+                // TypeError: network error or fetch failure
+                if (error.name !== 'AbortError' && !(error instanceof TypeError)) {
+                    console.warn(`Could not load history for ${asset.symbol}:`, error.message);
+                }
+            });
+    }
+
+    function updateMobileAccountInfo() {
+        if (!isMobileView()) return;
+
+        // Update from desktop elements
+        if (portfolioValueEl && mobilePortfolioValueEl) {
+            mobilePortfolioValueEl.textContent = portfolioValueEl.textContent;
+        }
+
+        if (availableCashEl && mobileCashBalanceEl) {
+            mobileCashBalanceEl.textContent = availableCashEl.textContent;
+        }
+
+        // Update performance page
+        const perfMap = {
+            'mobile-portfolio-value-perf': portfolioValueEl,
+            'mobile-total-pnl': totalPnlEl,
+            'mobile-total-return': totalReturnEl,
+            'mobile-realized-pnl': realizedPnlEl,
+            'mobile-unrealized-pnl': unrealizedPnlEl
+        };
+
+        Object.entries(perfMap).forEach(([mobileId, desktopEl]) => {
+            const mobileEl = document.getElementById(mobileId);
+            if (mobileEl && desktopEl) {
+                mobileEl.textContent = desktopEl.textContent;
+                mobileEl.className = desktopEl.className;
+            }
+        });
+        
+        // Update mobile portfolio chart
+        updateMobilePortfolioChart();
+    }
+
+    function createMobilePortfolioChart() {
+        if (mobilePortfolioChart) {
+            return mobilePortfolioChart;
+        }
+
+        const canvas = document.getElementById('mobile-portfolio-chart');
+        if (!canvas) {
+            return null;
+        }
+
+        const ctx = canvas.getContext('2d');
+        const accent = themeAccentColor || '#3b82f6';
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height || 250);
+        gradient.addColorStop(0, `${accent}33`);
+        gradient.addColorStop(1, `${accent}00`);
+
+        mobilePortfolioChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'Portfolio Value',
+                    data: [],
+                    borderColor: accent,
+                    backgroundColor: gradient,
+                    fill: 'origin',
+                    tension: 0.2,
+                    cubicInterpolationMode: 'monotone',
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    pointHoverBorderWidth: 2,
+                    pointHoverBorderColor: '#0a0e1a',
+                    pointHoverBackgroundColor: accent,
+                    spanGaps: true,
+                    normalized: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        enabled: true,
+                        backgroundColor: 'rgba(10, 14, 26, 0.95)',
+                        titleColor: '#94a3b8',
+                        bodyColor: '#e2e8f0',
+                        borderColor: 'rgba(148, 163, 184, 0.2)',
+                        borderWidth: 1,
+                        padding: 12,
+                        displayColors: false,
+                        callbacks: {
+                            title: function(context) {
+                                const date = new Date(context[0].parsed.x);
+                                return date.toLocaleString();
+                            },
+                            label: function(context) {
+                                return formatCurrencyLocale(context.parsed.y);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: 'hour',
+                            displayFormats: {
+                                hour: 'MMM d, ha'
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(148, 163, 184, 0.08)',
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: '#64748b',
+                            font: {
+                                size: 10,
+                                family: "'IBM Plex Sans', sans-serif"
+                            },
+                            maxRotation: 0,
+                            autoSkipPadding: 20
+                        }
+                    },
+                    y: {
+                        grid: {
+                            color: 'rgba(148, 163, 184, 0.08)',
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: '#64748b',
+                            font: {
+                                size: 10,
+                                family: "'IBM Plex Sans', sans-serif"
+                            },
+                            callback: function(value) {
+                                return formatCurrencyLocale(value);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        return mobilePortfolioChart;
+    }
+
+    function updateMobilePortfolioChart() {
+        if (!isMobileView()) return;
+        
+        const chart = createMobilePortfolioChart();
+        if (!chart) {
+            return;
+        }
+
+        // Use the same portfolio history data as desktop
+        chart.data.datasets[0].data = portfolioHistoryData.slice();
+        chart.update('none');
+        
+        // Update the latest value display
+        const latestValueEl = document.getElementById('mobile-chart-latest');
+        if (latestValueEl && portfolioHistoryData.length > 0) {
+            const latestValue = portfolioHistoryData[portfolioHistoryData.length - 1].y;
+            latestValueEl.textContent = formatCurrencyLocale(latestValue);
+        }
+    }
+
+    function updateMobilePrices(prices) {
+        if (!isMobileView()) return;
+
+        Object.entries(prices).forEach(([symbol, data]) => {
+            const priceEl = document.getElementById(`mobile-price-${symbol}`);
+            if (priceEl) {
+                const currentPrice = data.price;
+                priceEl.textContent = formatCurrencyLocale(currentPrice);
+                
+                // Apply color based on price change (match desktop behavior)
+                if (mobilePreviousPrices[symbol] !== undefined) {
+                    if (currentPrice > mobilePreviousPrices[symbol]) {
+                        priceEl.style.color = '#7dda58'; // Bright green for increase
+                    } else if (currentPrice < mobilePreviousPrices[symbol]) {
+                        priceEl.style.color = '#f85149'; // Bright red for decrease
+                    } else {
+                        priceEl.style.color = 'var(--terminal-accent)'; // Neutral
+                    }
+                }
+                
+                // Store current price for next comparison
+                mobilePreviousPrices[symbol] = currentPrice;
+                
+                // Update the mobileAssets array with latest price
+                const assetIndex = mobileAssets.findIndex(a => a.symbol === symbol);
+                if (assetIndex !== -1) {
+                    mobileAssets[assetIndex].price = currentPrice;
+                }
+            }
+
+            // Update chart if it exists
+            const chartObj = mobileCharts.find(c => c.symbol === symbol);
+            if (chartObj && chartObj.chart) {
+                const newPoint = {
+                    x: new Date(),
+                    y: data.price
+                };
+                chartObj.chart.data.datasets[0].data.push(newPoint);
+                
+                // Keep last 100 points
+                if (chartObj.chart.data.datasets[0].data.length > 100) {
+                    chartObj.chart.data.datasets[0].data.shift();
+                }
+                
+                chartObj.chart.update('none');
+            }
+        });
+        
+        // Update mobile buying power display if modal is open
+        if (mobileQuantityModal && mobileQuantityModal.classList.contains('active')) {
+            updateMobileBuyingPower();
+        }
+    }
+
+    function updateMobileExpiry(assets, forceUpdate = false) {
+        if (!isMobileView()) return;
+
+        assets.forEach(asset => {
+            const expiryEl = document.getElementById(`mobile-expiry-${asset.symbol}`);
+            if (!expiryEl) return;
+            
+            // Support both expires_in (from mobileAssets) and time_to_expiry_seconds (from socket updates)
+            const expirySeconds = asset.expires_in !== undefined ? asset.expires_in : asset.time_to_expiry_seconds;
+            
+            // When we receive fresh expiry data, store the expiry timestamp
+            if (expirySeconds !== undefined && forceUpdate) {
+                mobileExpiryTimestamps[asset.symbol] = Date.now() + (expirySeconds * 1000);
+            }
+            
+            // Calculate remaining time from stored timestamp
+            let seconds = 0;
+            if (mobileExpiryTimestamps[asset.symbol]) {
+                seconds = Math.max(0, Math.floor((mobileExpiryTimestamps[asset.symbol] - Date.now()) / 1000));
+            } else if (expirySeconds !== undefined) {
+                // Fallback if we don't have a timestamp yet
+                seconds = Math.floor(expirySeconds);
+                mobileExpiryTimestamps[asset.symbol] = Date.now() + (seconds * 1000);
+            } else {
+                return;
+            }
+            
+            // Use the same formatTimeToExpiry function as desktop Assets table
+            expiryEl.innerHTML = formatTimeToExpiry(seconds);
+        });
+    }
+
+    function updateMobileExpiryCountdown() {
+        if (!isMobileView()) return;
+        
+        // Update all assets based on stored timestamps
+        Object.keys(mobileExpiryTimestamps).forEach(symbol => {
+            const expiryEl = document.getElementById(`mobile-expiry-${symbol}`);
+            if (!expiryEl) return;
+            
+            const seconds = Math.max(0, Math.floor((mobileExpiryTimestamps[symbol] - Date.now()) / 1000));
+            
+            // Use the same formatTimeToExpiry function as desktop Assets table
+            expiryEl.innerHTML = formatTimeToExpiry(seconds);
+        });
+    }
+
+    function handleMobileTrade(tradeType) {
+        if (!mobileAssets[currentMobileAssetIndex]) return;
+
+        const asset = mobileAssets[currentMobileAssetIndex];
+        
+        pendingMobileTrade = {
+            symbol: asset.symbol,
+            type: tradeType
+        };
+
+        mobileQuantityTitle.textContent = `${tradeType === 'buy' ? 'Buy' : 'Sell'} ${asset.symbol}`;
+        mobileQuantityInput.value = '';
+        mobileQuantityInput.placeholder = tradeType === 'buy' ? 'Enter quantity' : 'Enter quantity';
+        
+        // Update buying power display
+        updateMobileBuyingPower();
+        
+        mobileQuantityModal.classList.add('active');
+        
+        // Focus input (no need to change body overflow as body is already fixed on mobile)
+        setTimeout(() => mobileQuantityInput.focus(), 100);
+    }
+
+    function updateMobileBuyingPower() {
+        if (!mobileAssets[currentMobileAssetIndex]) return;
+        
+        const asset = mobileAssets[currentMobileAssetIndex];
+        const currentPrice = asset.price || 0;
+        const isSelling = pendingMobileTrade && pendingMobileTrade.type === 'sell';
+        
+        const bpCashEl = document.getElementById('mobile-bp-cash');
+        const bpPriceEl = document.getElementById('mobile-bp-price');
+        const bpSharesEl = document.getElementById('mobile-bp-shares');
+        
+        // Get the label elements
+        const bpCashLabelEl = document.querySelector('.mobile-bp-row:nth-child(1) .mobile-bp-label');
+        const bpSharesLabelEl = document.querySelector('.mobile-bp-row:nth-child(3) .mobile-bp-label');
+        
+        if (isSelling) {
+            // When selling, show holdings information
+            const holdingQuantity = userPortfolio?.holdings?.[asset.symbol] || 0;
+            const holdingValue = holdingQuantity * currentPrice;
+            
+            if (bpCashLabelEl) bpCashLabelEl.textContent = 'Holdings Value:';
+            if (bpCashEl) bpCashEl.textContent = holdingQuantity > 0 ? formatCurrencyLocale(holdingValue) : formatCurrencyLocale(0);
+            
+            if (bpPriceEl) bpPriceEl.textContent = currentPrice > 0 ? formatCurrencyLocale(currentPrice) : '--';
+            
+            if (bpSharesLabelEl) bpSharesLabelEl.textContent = 'Shares Held:';
+            if (bpSharesEl) bpSharesEl.textContent = holdingQuantity > 0 ? formatNumber(holdingQuantity, 0) : '0';
+        } else {
+            // When buying, show buying power information
+            if (bpCashLabelEl) bpCashLabelEl.textContent = 'Available Cash:';
+            if (bpCashEl) bpCashEl.textContent = mobileCashBalanceEl ? mobileCashBalanceEl.textContent : formatCurrencyLocale(0);
+            
+            if (bpPriceEl) bpPriceEl.textContent = currentPrice > 0 ? formatCurrencyLocale(currentPrice) : '--';
+            
+            if (bpSharesLabelEl) bpSharesLabelEl.textContent = 'Max Shares:';
+            if (bpSharesEl && currentPrice > 0 && availableCashAmount > 0) {
+                const maxShares = Math.floor(availableCashAmount / currentPrice);
+                bpSharesEl.textContent = formatNumber(maxShares, 0);
+            } else if (bpSharesEl) {
+                bpSharesEl.textContent = '--';
+            }
+        }
+    }
+
+    function confirmMobileTrade() {
+        if (!pendingMobileTrade) return;
+
+        const quantity = parseFloat(mobileQuantityInput.value);
+        
+        if (isNaN(quantity) || quantity <= 0) {
+            alert('Please enter a valid quantity');
+            return;
+        }
+
+        socket.emit('trade', {
+            symbol: pendingMobileTrade.symbol,
+            type: pendingMobileTrade.type,
+            quantity: quantity
+        });
+
+        mobileQuantityModal.classList.remove('active');
+        pendingMobileTrade = null;
+        mobileQuantityInput.value = '';
+    }
+
+    async function handleMobileSellAll() {
+        if (!userPortfolio || !userPortfolio.holdings) return;
+        
+        const positions = Object.entries(userPortfolio.holdings).filter(([symbol, quantity]) => quantity > 0);
+        
+        if (positions.length === 0) {
+            showNotification('No positions to sell', 'warning');
+            return;
+        }
+        
+        // Confirm sell all
+        if (!confirm(`Are you sure you want to sell all ${positions.length} positions?`)) {
+            return;
+        }
+        
+        // Disable button during processing
+        if (mobileSellAllBtn) {
+            mobileSellAllBtn.disabled = true;
+            mobileSellAllBtn.style.opacity = '0.6';
+        }
+        
+        let successCount = 0;
+        let failCount = 0;
+        
+        showNotification(`Selling ${positions.length} positions... (0/${positions.length})`, 'info', { id: 'sell-all-progress' });
+        
+        // Process sells sequentially with a small delay between each
+        for (let i = 0; i < positions.length; i++) {
+            const [symbol, quantity] = positions[i];
+            
+            try {
+                // Wait for the previous trade to be acknowledged before sending the next
+                await new Promise((resolve) => {
+                    const tradePromise = new Promise((tradeResolve) => {
+                        // Set up one-time listener for trade confirmation
+                        const handleTradeConfirmation = (data) => {
+                            if (data.symbol === symbol) {
+                                socket.off('trade_confirmation', handleTradeConfirmation);
+                                if (data.success) {
+                                    successCount++;
+                                } else {
+                                    failCount++;
+                                }
+                                tradeResolve();
+                            }
+                        };
+                        socket.on('trade_confirmation', handleTradeConfirmation);
+                        
+                        // Send the trade
+                        socket.emit('trade', {
+                            symbol: symbol,
+                            type: 'sell',
+                            quantity: quantity
+                        });
+                    });
+                    
+                    // Add timeout to prevent hanging
+                    const timeout = setTimeout(() => {
+                        failCount++;
+                        resolve();
+                    }, 5000);
+                    
+                    tradePromise.then(() => {
+                        clearTimeout(timeout);
+                        // Update progress message
+                        const completed = successCount + failCount;
+                        removeNotificationById('sell-all-progress');
+                        showNotification(`Selling ${positions.length} positions... (${completed}/${positions.length})`, 'info', { id: 'sell-all-progress' });
+                        resolve();
+                    });
+                });
+                
+                // Small delay between trades to prevent overwhelming the server
+                if (i < positions.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+            } catch (error) {
+                failCount++;
+            }
+        }
+        
+        // Re-enable button
+        if (mobileSellAllBtn) {
+            mobileSellAllBtn.disabled = false;
+            mobileSellAllBtn.style.opacity = '1';
+        }
+        
+        // Remove progress notification
+        removeNotificationById('sell-all-progress');
+        
+        // Show final result
+        if (failCount === 0) {
+            showNotification(`Successfully sold all ${successCount} positions!`, 'success');
+        } else {
+            showNotification(`Sold ${successCount}/${positions.length} positions (${failCount} failed)`, 'warning');
+        }
+    }
+
+    function updateMobileTransactions(transactions) {
+        if (!isMobileView()) return;
+
+        const tbody = document.querySelector('#mobile-transactions-table tbody');
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+
+        transactions.slice(0, 50).forEach(tx => {
+            const row = document.createElement('tr');
+            row.className = `transaction-${tx.type}`;
+            
+            const date = new Date(tx.timestamp);
+            const timeStr = date.toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit'
+            });
+
+            // Color coding for transaction type matching desktop
+            const isSettlement = tx.type === 'settlement';
+            const typeColor = isSettlement ? '#f85149' : (tx.type === 'buy' ? '#7dda58' : '#f85149');
+            const typeText = isSettlement ? 'SETTLED' : (tx.type || '').toUpperCase();
+
+            row.innerHTML = `
+                <td>${timeStr}</td>
+                <td><span class="symbol-badge">${tx.symbol}</span></td>
+                <td style="color: ${typeColor}; font-weight: 600;">${typeText}</td>
+                <td>${formatQuantity(tx.quantity)}</td>
+                <td>${formatCurrencyLocale(tx.price)}</td>
+            `;
+
+            tbody.appendChild(row);
+        });
+    }
+
+    function updateMobileLeaderboard(leaderboard) {
+        if (!isMobileView()) return;
+
+        const tbody = document.querySelector('#mobile-leaderboard-table tbody');
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+
+        leaderboard.forEach((entry, index) => {
+            const row = document.createElement('tr');
+            
+            const totalPnl = Number(entry.total_pnl ?? 0);
+            
+            let className = 'pnl-neutral';
+            let pnlColor = '#94a3b8';
+            
+            if (totalPnl > 0) {
+                className = 'pnl-positive';
+                pnlColor = '#7dda58'; // Green for profit
+            } else if (totalPnl < 0) {
+                className = 'pnl-negative';
+                pnlColor = '#f85149'; // Red for loss
+            }
+            
+            row.className = className;
+
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${entry.user_id}</td>
+                <td style="color: ${pnlColor}; font-weight: 600;">${formatCurrencyLocale(totalPnl)}</td>
+            `;
+
+            tbody.appendChild(row);
+        });
+    }
+
+    // Initialize mobile view if needed
+    if (isMobileView()) {
+        initMobileView();
+    }
+
+    // Listen for window resize
+    window.addEventListener('resize', () => {
+        if (isMobileView() && mobileCarousel && mobileCarousel.children.length === 0) {
+            initMobileView();
+            if (latestAssetsSnapshot) {
+                updateMobileAssets(latestAssetsSnapshot);
+            }
+        }
+    });
 });

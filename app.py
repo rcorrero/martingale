@@ -1315,7 +1315,7 @@ def expiration_check_thread():
                     
                     # Notify all connected clients about settlements
                     socketio.emit('assets_updated', {
-                        'message': f"{stats['expired_assets']} assets expired and settled",
+                        'message': f"{stats['expired_assets']} asset(s) expired and settled",
                         'stats': stats
                     })
                     

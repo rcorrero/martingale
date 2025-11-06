@@ -21,6 +21,175 @@
     <!-- Notification area for settlements -->
     <div id="notification-container" class="notification-container"></div>
     
+    <!-- Mobile View (shown on small screens) -->
+    <div class="mobile-view">
+        <!-- Fixed top bar with account info -->
+        <div class="mobile-top-bar">
+            <div class="mobile-account-value">
+                <div class="mobile-account-label">Portfolio</div>
+                <div class="mobile-account-amount" id="mobile-portfolio-value">$0.00</div>
+            </div>
+            <div class="mobile-cash">
+                <div class="mobile-cash-label">Cash</div>
+                <div class="mobile-cash-amount" id="mobile-cash-balance">$0.00</div>
+            </div>
+        </div>
+
+        <!-- Asset carousel container -->
+        <div class="mobile-asset-carousel" id="mobile-carousel">
+            <!-- Asset search at top of carousel -->
+            <div class="mobile-asset-search-container">
+                <input type="text" id="mobile-asset-search" class="mobile-asset-search" placeholder="Search Assets...">
+            </div>
+            <!-- Asset cards will be dynamically inserted here -->
+        </div>
+
+        <!-- Tab bar for navigation -->
+        <div class="mobile-tab-bar">
+            <button class="mobile-tab active" data-page="assets">
+                <div class="mobile-tab-label">Assets</div>
+            </button>
+            <button class="mobile-tab" data-page="history">
+                <div class="mobile-tab-label">History</div>
+            </button>
+            <button class="mobile-tab" data-page="leaderboard">
+                <div class="mobile-tab-label">Leaders</div>
+            </button>
+            <button class="mobile-tab" data-page="account">
+                <div class="mobile-tab-label">Account</div>
+            </button>
+        </div>
+
+        <!-- Fixed bottom bar with trade controls -->
+        <div class="mobile-bottom-bar">
+            <button class="mobile-trade-btn mobile-buy-btn" id="mobile-buy-btn">Buy</button>
+            <button class="mobile-trade-btn mobile-sell-btn" id="mobile-sell-btn">Sell</button>
+            <button class="mobile-trade-btn mobile-sell-all-btn" id="mobile-sell-all-btn">Sell All</button>
+        </div>
+
+        <!-- Mobile pages -->
+        <div class="mobile-page" id="mobile-page-history">
+            <h2>Transaction History</h2>
+            <div id="mobile-transactions-container">
+                <table id="mobile-transactions-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Symbol</th>
+                            <th>Type</th>
+                            <th>Qty</th>
+                            <th>Price</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mobile-page" id="mobile-page-leaderboard">
+            <h2>Leaderboard</h2>
+            <div id="mobile-leaderboard-container">
+                <table id="mobile-leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>User ID</th>
+                            <th>P&L</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mobile-page" id="mobile-page-account">
+            <h2>Account</h2>
+            <div class="mobile-user-info">
+                <div class="mobile-user-details">
+                    <span class="mobile-user-name">{{ current_user.username }}</span>
+                    <span class="mobile-user-id">USER ID: {{ current_user.id }}</span>
+                </div>
+                <div class="mobile-user-actions">
+                    <a href="{{ url_for('about') }}" class="about-btn">About</a>
+                    <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+                </div>
+            </div>
+            <div class="mobile-portfolio-section">
+                <div class="mobile-holdings-section">
+                    <h3>Holdings</h3>
+                    <ul id="mobile-holdings-list">
+                        <!-- Holdings will be populated by JavaScript -->
+                    </ul>
+                </div>
+                <div class="mobile-allocation-section">
+                    <h3>Allocation</h3>
+                    <div class="mobile-portfolio-pie-container">
+                        <canvas id="mobile-portfolio-pie-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="mobile-chart-section">
+                <div class="mobile-chart-card">
+                    <div class="mobile-chart-header">
+                        <h3>Portfolio Performance</h3>
+                        <span class="mobile-chart-value" id="mobile-chart-latest">--</span>
+                    </div>
+                    <div class="mobile-chart-container">
+                        <canvas id="mobile-portfolio-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="performance-grid">
+                <div class="performance-item">
+                    <span class="performance-label">Portfolio Value</span>
+                    <span class="performance-value" id="mobile-portfolio-value-perf">$0.00</span>
+                </div>
+                <div class="performance-item">
+                    <span class="performance-label">Total P&L</span>
+                    <span class="performance-value" id="mobile-total-pnl">$0.00</span>
+                </div>
+                <div class="performance-item">
+                    <span class="performance-label">Total Return</span>
+                    <span class="performance-value" id="mobile-total-return">0.00%</span>
+                </div>
+                <div class="performance-item">
+                    <span class="performance-label">Realized P&L</span>
+                    <span class="performance-value" id="mobile-realized-pnl">$0.00</span>
+                </div>
+                <div class="performance-item">
+                    <span class="performance-label">Unrealized P&L</span>
+                    <span class="performance-value" id="mobile-unrealized-pnl">$0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quantity input modal -->
+        <div class="mobile-quantity-modal" id="mobile-quantity-modal">
+            <div class="mobile-quantity-content">
+                <h3 id="mobile-quantity-title">Enter Quantity</h3>
+                <div class="mobile-buying-power">
+                    <div class="mobile-bp-row">
+                        <span class="mobile-bp-label">Available Cash:</span>
+                        <span class="mobile-bp-value" id="mobile-bp-cash">$0.00</span>
+                    </div>
+                    <div class="mobile-bp-row">
+                        <span class="mobile-bp-label">Current Price:</span>
+                        <span class="mobile-bp-value" id="mobile-bp-price">--</span>
+                    </div>
+                    <div class="mobile-bp-row">
+                        <span class="mobile-bp-label">Max Shares:</span>
+                        <span class="mobile-bp-value" id="mobile-bp-shares">--</span>
+                    </div>
+                </div>
+                <input type="number" class="mobile-quantity-input" id="mobile-quantity-input" placeholder="0" min="0" step="any">
+                <div class="mobile-quantity-actions">
+                    <button class="mobile-quantity-cancel" id="mobile-quantity-cancel">Cancel</button>
+                    <button class="mobile-quantity-confirm" id="mobile-quantity-confirm">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <div class="container">
         <div class="header">
             <h1>Martingale</h1>
