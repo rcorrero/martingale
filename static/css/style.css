@@ -128,8 +128,15 @@ h2 {
 }
 
 .user-info .user-name {
-    color: var(--terminal-text);
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--terminal-accent);
+    background: var(--terminal-accent-bg);
+    color: var(--terminal-accent);
     font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
     letter-spacing: 0.6px;
 }
 
@@ -2893,13 +2900,20 @@ body.info-page {
     flex-direction: column;
     gap: 8px;
     margin-bottom: 15px;
-    align-items: center;
-    text-align: center;
+    align-items: stretch;
 }
 
 .mobile-user-name {
-    color: var(--terminal-text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--terminal-accent);
+    background: var(--terminal-accent-bg);
+    color: var(--terminal-accent);
     font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
     font-size: 16px;
     letter-spacing: 0.6px;
 }
@@ -2907,6 +2921,7 @@ body.info-page {
 .mobile-user-id {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     padding: 4px 8px;
     border-radius: 6px;
     border: 1px solid var(--terminal-border);
@@ -2915,18 +2930,17 @@ body.info-page {
     font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
     letter-spacing: 0.6px;
-    align-self: flex-start;
 }
 
 .mobile-user-actions {
     display: flex;
+    flex-direction: column;
     gap: 10px;
-    justify-content: center;
 }
 
 .mobile-user-actions .about-btn,
 .mobile-user-actions .logout-btn {
-    flex: 1;
+    width: 100%;
     text-align: center;
     padding: 12px 18px;
 }
