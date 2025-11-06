@@ -2277,9 +2277,15 @@ body.info-page {
     left: 0;
     right: 0;
     bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    /* Use dynamic viewport units for iOS Safari */
+    height: 100dvh;
     background: var(--terminal-bg);
     overflow: hidden;
     z-index: 1000;
+    /* Helps trigger Safari's minimal-ui behavior */
+    -webkit-overflow-scrolling: touch;
 }
 
 /* Asset card carousel container */
@@ -2289,7 +2295,7 @@ body.info-page {
     left: 0;
     right: 0;
     bottom: 80px; /* Leave space for bottom controls */
-    overflow-y: auto;
+    overflow-y: hidden; /* Completely disable scroll on carousel */
     overflow-x: hidden;
     touch-action: pan-y;
     -webkit-overflow-scrolling: touch;
@@ -2951,7 +2957,7 @@ body.info-page {
     border-radius: 8px;
     color: var(--terminal-text);
     font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
+    font-size: 16px; /* Must be 16px or larger to prevent mobile browser auto-zoom on focus */
     transition: all 0.3s ease;
 }
 

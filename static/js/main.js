@@ -3082,8 +3082,8 @@ document.addEventListener('DOMContentLoaded', () => {
             mobileCarousel.addEventListener('touchmove', handleMobileTouchMove, { passive: false });
             mobileCarousel.addEventListener('touchend', handleMobileTouchEnd, { passive: true });
             
-            // Set up wheel handler for trackpad/mouse wheel gestures
-            mobileCarousel.addEventListener('wheel', handleMobileWheel, { passive: false });
+            // Note: Wheel/scroll navigation is completely disabled on mobile for better UX
+            // Only touch swipe gestures navigate between asset cards
         }
 
         // Set up trade buttons
