@@ -2272,43 +2272,27 @@ body.info-page {
 /* Mobile viewport container - full screen swipeable interface */
 .mobile-view {
     display: none; /* Hidden by default, shown only on small screens */
-    position: fixed;
+    position: absolute; /* Changed from fixed to allow page scroll */
     top: 0;
     left: 0;
     right: 0;
-    bottom: 0;
     width: 100vw;
-    height: 100vh;
+    min-height: 100vh;
     /* Use dynamic viewport units for iOS Safari */
-    height: 100dvh;
+    min-height: 100dvh;
     background: var(--terminal-bg);
-    overflow: hidden;
+    overflow: visible;
     z-index: 1000;
-    /* Helps trigger Safari's minimal-ui behavior */
-    -webkit-overflow-scrolling: touch;
 }
 
 /* Asset card carousel container */
 .mobile-asset-carousel {
-    position: absolute;
+    position: fixed; /* Keep cards in fixed position */
     top: 0;
     left: 0;
     right: 0;
     bottom: 80px; /* Leave space for bottom controls */
-    /* Enable scroll to trigger Safari auto-hide, but prevent actual scrolling */
-    overflow-y: scroll;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-    /* Prevent momentum scrolling from interfering with swipes */
-    overscroll-behavior-y: contain;
-}
-
-/* Add minimal scrollable content to trigger Safari auto-hide */
-.mobile-asset-carousel::after {
-    content: '';
-    display: block;
-    height: calc(100% + 1px);
-    pointer-events: none;
+    overflow: hidden;
 }
 
 /* Individual asset card - fills entire viewport */
@@ -3128,12 +3112,14 @@ body.info-page {
 
 /* Show mobile view on small screens */
 @media (max-width: 768px) {
-    /* Main body - fixed for mobile app */
+    /* Main body - enable minimal scroll for Safari auto-hide */
     body {
-        overflow: hidden;
-        position: fixed;
+        overflow-y: scroll;
+        -webkit-overflow-scrolling: touch;
+        position: relative;
         width: 100%;
-        height: 100%;
+        min-height: calc(100vh + 1px);
+        min-height: calc(100dvh + 1px);
     }
     
     /* Allow info/auth pages to scroll on mobile */

@@ -3064,11 +3064,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     mobileCarousel.style.display = 'block';
                     mobilePages.forEach(p => p.classList.remove('active'));
                     
-                    // Trigger a small scroll to activate Safari auto-hide
+                    // Trigger a small window scroll to activate Safari auto-hide
                     setTimeout(() => {
-                        if (mobileCarousel) {
-                            mobileCarousel.scrollTop = 1;
-                        }
+                        window.scrollTo(0, 1);
                     }, 100);
                 } else {
                     mobileCarousel.style.display = 'none';
@@ -3092,6 +3090,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // Note: Wheel/scroll navigation is completely disabled on mobile for better UX
             // Only touch swipe gestures navigate between asset cards
         }
+        
+        // Prevent actual scrolling while maintaining scroll position for Safari auto-hide
+        window.addEventListener('scroll', () => {
+            if (isMobileView() && window.scrollY !== 1) {
+                window.scrollTo(0, 1);
+            }
+        }, { passive: true });
 
         // Set up trade buttons
         if (mobileBuyBtn) {
@@ -3143,11 +3148,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Initialize mobile data
         updateMobileAccountInfo();
         
-        // Trigger initial scroll to activate Safari auto-hide on page load
+        // Trigger initial window scroll to activate Safari auto-hide on page load
         setTimeout(() => {
-            if (mobileCarousel) {
-                mobileCarousel.scrollTop = 1;
-            }
+            window.scrollTo(0, 1);
         }, 500);
         
         // Start real-time expiry countdown updates for mobile view
@@ -3162,9 +3165,9 @@ document.addEventListener('DOMContentLoaded', () => {
         touchStartY = e.touches[0].clientY;
         isSwiping = false;
         
-        // Keep scroll position at 1px to maintain Safari auto-hide trigger
-        if (mobileCarousel && mobileCarousel.scrollTop !== 1) {
-            mobileCarousel.scrollTop = 1;
+        // Keep window scroll position at 1px to maintain Safari auto-hide trigger
+        if (window.scrollY !== 1) {
+            window.scrollTo(0, 1);
         }
     }
 
@@ -3180,9 +3183,9 @@ document.addEventListener('DOMContentLoaded', () => {
             isSwiping = true;
         }
         
-        // Maintain scroll position at 1px
-        if (mobileCarousel && mobileCarousel.scrollTop !== 1) {
-            mobileCarousel.scrollTop = 1;
+        // Maintain window scroll position at 1px
+        if (window.scrollY !== 1) {
+            window.scrollTo(0, 1);
         }
     }
 
@@ -3191,10 +3194,8 @@ document.addEventListener('DOMContentLoaded', () => {
             touchStartY = 0;
             touchEndY = 0;
             
-            // Reset scroll position
-            if (mobileCarousel) {
-                mobileCarousel.scrollTop = 1;
-            }
+            // Reset window scroll position
+            window.scrollTo(0, 1);
             return;
         }
 
@@ -3215,10 +3216,8 @@ document.addEventListener('DOMContentLoaded', () => {
         touchEndY = 0;
         isSwiping = false;
         
-        // Reset scroll position after swipe
-        if (mobileCarousel) {
-            mobileCarousel.scrollTop = 1;
-        }
+        // Reset window scroll position after swipe
+        window.scrollTo(0, 1);
     }
 
     function handleMobileWheel(e) {
