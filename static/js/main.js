@@ -3063,6 +3063,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (pageName === 'assets') {
                     mobileCarousel.style.display = 'block';
                     mobilePages.forEach(p => p.classList.remove('active'));
+                    
+                    // Trigger a small scroll to activate Safari auto-hide
+                    setTimeout(() => {
+                        if (mobileCarousel) {
+                            mobileCarousel.scrollTop = 1;
+                        }
+                    }, 100);
                 } else {
                     mobileCarousel.style.display = 'none';
                     mobilePages.forEach(p => {
@@ -3136,6 +3143,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // Initialize mobile data
         updateMobileAccountInfo();
         
+        // Trigger initial scroll to activate Safari auto-hide on page load
+        setTimeout(() => {
+            if (mobileCarousel) {
+                mobileCarousel.scrollTop = 1;
+            }
+        }, 500);
+        
         // Start real-time expiry countdown updates for mobile view
         setInterval(() => {
             if (isMobileView()) {
@@ -3147,6 +3161,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleMobileTouchStart(e) {
         touchStartY = e.touches[0].clientY;
         isSwiping = false;
+        
+        // Keep scroll position at 1px to maintain Safari auto-hide trigger
+        if (mobileCarousel && mobileCarousel.scrollTop !== 1) {
+            mobileCarousel.scrollTop = 1;
+        }
     }
 
     function handleMobileTouchMove(e) {
@@ -3160,12 +3179,22 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             isSwiping = true;
         }
+        
+        // Maintain scroll position at 1px
+        if (mobileCarousel && mobileCarousel.scrollTop !== 1) {
+            mobileCarousel.scrollTop = 1;
+        }
     }
 
     function handleMobileTouchEnd(e) {
         if (!isSwiping) {
             touchStartY = 0;
             touchEndY = 0;
+            
+            // Reset scroll position
+            if (mobileCarousel) {
+                mobileCarousel.scrollTop = 1;
+            }
             return;
         }
 
@@ -3185,6 +3214,11 @@ document.addEventListener('DOMContentLoaded', () => {
         touchStartY = 0;
         touchEndY = 0;
         isSwiping = false;
+        
+        // Reset scroll position after swipe
+        if (mobileCarousel) {
+            mobileCarousel.scrollTop = 1;
+        }
     }
 
     function handleMobileWheel(e) {
