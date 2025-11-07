@@ -2403,6 +2403,7 @@ body.info-page {
     flex-wrap: wrap;
     gap: 4px 8px;
     align-items: center;
+    justify-content: center;
 }
 
 .mobile-position-label {
@@ -2416,18 +2417,12 @@ body.info-page {
 .mobile-position-vwap {
     color: var(--terminal-text);
     font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 80px;
 }
 
 .mobile-position-pnl {
     font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 120px;
 }
 
 .mobile-position-pnl.positive {
@@ -2448,6 +2443,12 @@ body.info-page {
     font-size: 13px;
     color: var(--terminal-text-secondary);
     font-family: 'IBM Plex Sans', sans-serif;
+}
+
+.mobile-expiry-label {
+    color: var(--terminal-text-secondary);
+    font-weight: 500;
+    margin-right: 4px;
 }
 
 /* Chart container in mobile view */
@@ -2683,8 +2684,7 @@ body.info-page {
     border-collapse: collapse;
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
-    table-layout: auto;
-    min-width: 600px;
+    table-layout: fixed;
 }
 
 #mobile-transactions-table thead,
@@ -2791,11 +2791,28 @@ body.info-page {
 
 /* Column widths for mobile leaderboard */
 #mobile-leaderboard-table th:nth-child(1),
-#mobile-leaderboard-table td:nth-child(1) { min-width: 60px; }
+#mobile-leaderboard-table td:nth-child(1) { 
+    width: 32px;
+    max-width: 32px;
+    padding: 6px 2px;
+    text-align: center;
+}
 #mobile-leaderboard-table th:nth-child(2),
-#mobile-leaderboard-table td:nth-child(2) { min-width: 120px; }
+#mobile-leaderboard-table td:nth-child(2) { 
+    width: 50px;
+    max-width: 50px;
+    padding: 6px 4px;
+    font-size: 10px;
+    text-align: center;
+}
 #mobile-leaderboard-table th:nth-child(3),
-#mobile-leaderboard-table td:nth-child(3) { min-width: 120px; }
+#mobile-leaderboard-table td:nth-child(3) { 
+    width: 90px;
+    max-width: 90px;
+    padding: 6px 4px;
+    text-align: right;
+    font-size: 10px;
+}
 
 /* Mobile performance grid in account page */
 .mobile-page .performance-grid {
@@ -2978,8 +2995,8 @@ body.info-page {
     background: var(--terminal-surface-light);
     border-radius: 12px;
     border: 1px solid var(--terminal-border);
-    padding: 20px;
-    margin: 0 20px 20px 20px;
+    padding: 15px;
+    margin-bottom: 15px;
 }
 
 .mobile-user-details {
@@ -2996,9 +3013,9 @@ body.info-page {
     justify-content: center;
     padding: 6px 12px;
     border-radius: 6px;
-    border: 1px solid var(--terminal-accent);
-    background: var(--terminal-accent-bg);
-    color: var(--terminal-accent);
+    border: 1px solid var(--terminal-border);
+    background: var(--terminal-panel-overlay);
+    color: var(--terminal-text);
     font-weight: 600;
     font-family: 'JetBrains Mono', monospace;
     font-size: 16px;

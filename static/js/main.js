@@ -2326,6 +2326,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateMobileAccountInfo();
             updateMobilePrices(assets);
             updateMobileExpiry(Object.values(assets), true); // Force update with fresh server data
+            updateMobilePnL(); // Update P&L displays on asset cards
         }
     });
 
@@ -3351,7 +3352,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="mobile-asset-symbol">${asset.symbol}</div>
                 <div class="mobile-asset-price" id="mobile-price-${asset.symbol}">$${asset.price ? asset.price.toFixed(2) : '0.00'}</div>
                 ${positionHtml}
-                <div class="mobile-asset-expiry" id="mobile-expiry-${asset.symbol}">${expiryText}</div>
+                <div class="mobile-asset-expiry"><span class="mobile-expiry-label">Expiry:</span> <span id="mobile-expiry-${asset.symbol}">${expiryText}</span></div>
             </div>
             <div class="mobile-asset-chart">
                 <canvas id="mobile-chart-${asset.symbol}"></canvas>
