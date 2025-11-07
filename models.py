@@ -276,7 +276,7 @@ class Asset(db.Model):
         # Standard deviation ~0.01 means drift is typically within 1% of zero
         # (68% of values within ±0.01, 95% within ±0.02)
         if drift is None:
-            drift = random.gauss(0.0, 0.01)
+            drift = random.gauss(0.0, 0.001)
         
         # Ensure |drift| <= sigma to prevent explosive price movements
         # Clip drift to [-sigma, sigma] range
