@@ -3440,8 +3440,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createMobileAssetChart(canvas, asset) {
+        if (!canvas) return;
+        
         const ctx = canvas.getContext('2d');
         const assetColor = getInstrumentColor(asset.symbol, asset);
+
+        // Remove any existing chart for this symbol to avoid duplicates
+        const existingIndex = mobileCharts.findIndex(c => c.symbol === asset.symbol);
+        if (existingIndex !== -1) {
+            // Destroy the old chart instance
+            if (mobileCharts[existingIndex].chart) {
+                mobileCharts[existingIndex].chart.destroy();
+            }
+            mobileCharts.splice(existingIndex, 1);
+        }
 
         const chart = new Chart(ctx, {
             type: 'line',
@@ -3555,6 +3567,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     }));
                     chart.data.datasets[0].data = history;
                     chart.update('none');
+                    
+                    // Update VWAP line after historical data is loaded
+                    updateMobileVWAPLine(asset.symbol);
                 }
             })
             .catch(error => {
@@ -3861,11 +3876,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (symbolEl && symbolEl.textContent === asset.symbol) {
                         const newCard = createMobileAssetCard(asset, index);
                         card.replaceWith(newCard);
-                        if (index === currentMobileAssetIndex) {
-                            const canvas = newCard.querySelector(`#mobile-chart-${asset.symbol}`);
-                            if (canvas) {
-                                createMobileAssetChart(canvas, asset);
-                            }
+                        // Always create the chart, not just for the active asset
+                        const canvas = newCard.querySelector(`#mobile-chart-${asset.symbol}`);
+                        if (canvas) {
+                            createMobileAssetChart(canvas, asset);
                         }
                     }
                 });
