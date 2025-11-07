@@ -239,10 +239,11 @@ class AssetManager:
                         self.price_service.fallback.assets[asset.symbol] = {
                             'price': asset.current_price,
                             'volatility': asset.volatility,
+                            'drift': asset.drift,
                             'history': [],
                             'last_update': None
                         }
-                        logger.info(f"Registered {asset.symbol} with price service")
+                        logger.info(f"Registered {asset.symbol} with price service (volatility={asset.volatility:.4f}, drift={asset.drift:.6f})")
                 except Exception as e:
                     logger.error(f"Error registering asset {asset.symbol} with price service: {e}")
         

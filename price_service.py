@@ -61,6 +61,7 @@ class PriceService:
                 self.assets[symbol] = {
                     'price': config_data['price'],
                     'volatility': config_data['volatility'],
+                    'drift': config_data.get('drift', 0.0),  # Default to 0.0 for backward compatibility
                     'history': [],
                     'last_update': None
                 }
@@ -113,7 +114,7 @@ class PriceService:
                 time.sleep(1)  # Brief pause before retry
     
     def _update_prices(self):
-        """Update all asset prices using geometric Brownian motion to ensure martingale property."""
+        """Update all asset prices using geometric Brownian motion with drift."""
         timestamp = time.time() * 1000  # JavaScript-compatible timestamp
         
         # Round timestamp to nearest second to avoid sub-second duplicates
@@ -125,24 +126,27 @@ class PriceService:
                 (len(data['history']) > 0 and data['history'][-1]['time'] == timestamp)):
                 continue
             
-            # Get volatility from config or asset data
+            # Get parameters from config or asset data
             volatility = data.get('volatility', 0.02)
+            drift = data.get('drift', 0.0)  # Default to 0.0 for backward compatibility
             
-            # Use geometric Brownian motion with drift correction for martingale property
+            # Use geometric Brownian motion with drift
             # S(t+dt) = S(t) * exp((mu - 0.5*sigma^2)*dt + sigma*sqrt(dt)*Z)
-            # For a martingale, mu = 0, so we get:
-            # S(t+dt) = S(t) * exp(-0.5*sigma^2*dt + sigma*sqrt(dt)*Z)
-            # where Z ~ N(0,1)
+            # where:
+            #   mu = drift (mean return rate)
+            #   sigma = volatility
+            #   Z ~ N(0,1)
             
             dt = 1.0  # 1 second time step
             sigma = volatility
+            mu = drift
             
             # Generate random shock from standard normal
             z = np.random.standard_normal()
             
-            # Calculate multiplicative factor with drift correction
-            # The -0.5*sigma^2*dt term ensures E[S(t+dt)] = S(t)
-            log_return = -0.5 * sigma**2 * dt + sigma * np.sqrt(dt) * z
+            # Calculate log-return with drift
+            # The -0.5*sigma^2*dt term is the Itô correction
+            log_return = (mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * z
             
             # Update price using exponential (geometric Brownian motion)
             new_price = data['price'] * np.exp(log_return)
@@ -195,11 +199,12 @@ class PriceService:
             return self.assets.get(symbol, {})
         return self.assets
     
-    def add_asset(self, symbol, initial_price, volatility=0.02):
+    def add_asset(self, symbol, initial_price, volatility=0.02, drift=0.0):
         """Add a new asset to the service."""
         self.assets[symbol] = {
             'price': initial_price,
             'volatility': volatility,
+            'drift': drift,
             'history': [],
             'last_update': None
         }

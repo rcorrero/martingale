@@ -219,6 +219,7 @@ class Asset(db.Model):
     initial_price = db.Column(db.Float, nullable=False)
     current_price = db.Column(db.Float, nullable=False)
     volatility = db.Column(db.Float, default=0.02)
+    drift = db.Column(db.Float, default=0.0)  # Mean return (mu) for GBM - default 0.0 for backward compatibility
     color = db.Column(db.String(7), nullable=False)  # Hex color code
     created_at = db.Column(db.DateTime, default=current_utc, nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False, index=True)
@@ -253,12 +254,13 @@ class Asset(db.Model):
                 return symbol
     
     @staticmethod
-    def create_new_asset(initial_price=100.0, volatility=None, minutes_to_expiry=None):
+    def create_new_asset(initial_price=100.0, volatility=None, drift=None, minutes_to_expiry=None):
         """Create a new asset with random expiration between 5 minutes and 8 hours.
         
         Args:
             initial_price: Starting price for the asset
             volatility: Price volatility (random if None)
+            drift: Mean return rate (random from normal distribution if None)
             minutes_to_expiry: Specific minutes to expiry (random 5-480 if None)
         
         Returns:
@@ -269,6 +271,12 @@ class Asset(db.Model):
         # Random volatility between 0.1% and 20% if not specified
         if volatility is None:
             volatility = random.uniform(0.001, 0.20)
+        
+        # Random drift from normal distribution if not specified
+        # Standard deviation ~0.01 means drift is typically within 1% of zero
+        # (68% of values within ±0.01, 95% within ±0.02)
+        if drift is None:
+            drift = random.gauss(0.0, 0.01)
         
         # Random expiration between 5 minutes and 8 hours (480 minutes)
         # Using exponential distribution for average around 30 minutes
@@ -286,6 +294,7 @@ class Asset(db.Model):
             initial_price=initial_price,
             current_price=initial_price,
             volatility=volatility,
+            drift=drift,
             color=Asset.get_random_color(),
             expires_at=expires_at,
             is_active=True
@@ -330,6 +339,7 @@ class Asset(db.Model):
             'price': self.current_price,
             'initial_price': self.initial_price,
             'volatility': self.volatility,
+            'drift': self.drift,
             'created_at': self.created_at.isoformat(),
             'expires_at': self.expires_at.isoformat(),
             'time_to_expiry_seconds': ttl.total_seconds() if ttl else 0,

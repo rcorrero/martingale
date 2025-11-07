@@ -158,22 +158,25 @@ class FallbackPriceService:
             self.assets[symbol] = {
                 'price': config['price'],
                 'volatility': config.get('volatility', 0.02),
+                'drift': config.get('drift', 0.0),  # Default to 0.0 for backward compatibility
                 'history': [],
                 'last_update': None
             }
     
-    def add_asset(self, symbol: str, initial_price: float, volatility: float = 0.02):
+    def add_asset(self, symbol: str, initial_price: float, volatility: float = 0.02, drift: float = 0.0):
         """Add a new asset to the fallback service.
         
         Args:
             symbol: Asset symbol
             initial_price: Starting price
             volatility: Price volatility
+            drift: Mean return rate (default 0.0 for martingale)
         """
         if symbol not in self.assets:
             self.assets[symbol] = {
                 'price': initial_price,
                 'volatility': volatility,
+                'drift': drift,
                 'history': [],
                 'last_update': None
             }
@@ -198,7 +201,7 @@ class FallbackPriceService:
         return list(self.assets.keys())
     
     def update_prices(self):
-        """Update prices using geometric Brownian motion to ensure martingale property."""
+        """Update prices using geometric Brownian motion with drift."""
         import numpy as np
         
         timestamp = time.time() * 1000
@@ -211,21 +214,23 @@ class FallbackPriceService:
                 (len(data['history']) > 0 and data['history'][-1]['time'] == timestamp)):
                 continue
             
-            # Use geometric Brownian motion with drift correction for martingale property
+            # Use geometric Brownian motion with drift
             # S(t+dt) = S(t) * exp((mu - 0.5*sigma^2)*dt + sigma*sqrt(dt)*Z)
-            # For a martingale, mu = 0, so we get:
-            # S(t+dt) = S(t) * exp(-0.5*sigma^2*dt + sigma*sqrt(dt)*Z)
-            # where Z ~ N(0,1)
+            # where:
+            #   mu = drift (mean return rate)
+            #   sigma = volatility
+            #   Z ~ N(0,1)
             
             dt = 1.0  # 1 second time step
             sigma = data['volatility']
+            mu = data.get('drift', 0.0)  # Default to 0.0 for backward compatibility
             
             # Generate random shock from standard normal
             z = np.random.standard_normal()
             
-            # Calculate multiplicative factor with drift correction
-            # The -0.5*sigma^2*dt term ensures E[S(t+dt)] = S(t)
-            log_return = -0.5 * sigma**2 * dt + sigma * np.sqrt(dt) * z
+            # Calculate log-return with drift
+            # The -0.5*sigma^2*dt term is the Itô correction
+            log_return = (mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * z
             
             # Update price using exponential (geometric Brownian motion)
             data['price'] *= np.exp(log_return)
@@ -340,14 +345,18 @@ class HybridPriceService:
         current_symbols = set(self.fallback.get_symbols())
         db_symbols = {asset.symbol for asset in active_assets}
         
-        # Add new assets
+        # Add new assets or update existing ones with drift
         for asset in active_assets:
             if asset.symbol not in current_symbols:
                 self.fallback.add_asset(
                     symbol=asset.symbol,
                     initial_price=asset.initial_price,
-                    volatility=asset.volatility
+                    volatility=asset.volatility,
+                    drift=getattr(asset, 'drift', 0.0)  # Safe access for backward compatibility
                 )
+            else:
+                # Update drift for existing assets (in case it changed)
+                self.fallback.assets[asset.symbol]['drift'] = getattr(asset, 'drift', 0.0)
         
         # Remove assets no longer in database
         for symbol in current_symbols - db_symbols:
