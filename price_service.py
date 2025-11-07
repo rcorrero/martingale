@@ -130,6 +130,9 @@ class PriceService:
             volatility = data.get('volatility', 0.02)
             drift = data.get('drift', 0.0)  # Default to 0.0 for backward compatibility
             
+            # Ensure |drift| <= sigma to prevent explosive price movements
+            drift = max(-volatility, min(volatility, drift))
+            
             # Use geometric Brownian motion with drift
             # S(t+dt) = S(t) * exp((mu - 0.5*sigma^2)*dt + sigma*sqrt(dt)*Z)
             # where:

@@ -278,6 +278,10 @@ class Asset(db.Model):
         if drift is None:
             drift = random.gauss(0.0, 0.01)
         
+        # Ensure |drift| <= sigma to prevent explosive price movements
+        # Clip drift to [-sigma, sigma] range
+        drift = max(-volatility, min(volatility, drift))
+        
         # Random expiration between 5 minutes and 8 hours (480 minutes)
         # Using exponential distribution for average around 30 minutes
         if minutes_to_expiry is None:

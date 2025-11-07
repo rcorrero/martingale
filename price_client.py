@@ -225,6 +225,9 @@ class FallbackPriceService:
             sigma = data['volatility']
             mu = data.get('drift', 0.0)  # Default to 0.0 for backward compatibility
             
+            # Ensure |drift| <= sigma to prevent explosive price movements
+            mu = max(-sigma, min(sigma, mu))
+            
             # Generate random shock from standard normal
             z = np.random.standard_normal()
             
