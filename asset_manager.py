@@ -54,6 +54,20 @@ class AssetManager:
         
         return query.all()
     
+    def get_worthless_assets(self, threshold: float = 0.01) -> List[Asset]:
+        """Get active assets whose price has fallen below threshold.
+        
+        Args:
+            threshold: Price threshold below which assets are considered worthless
+        
+        Returns:
+            List of active Asset objects with price below threshold
+        """
+        return Asset.query.filter(
+            Asset.is_active == True,
+            Asset.current_price < threshold
+        ).all()
+    
     def check_and_expire_assets(self) -> List[Asset]:
         """Check for expired assets and mark them as expired.
         
@@ -70,6 +84,32 @@ class AssetManager:
             db.session.commit()
         
         return expired_assets
+    
+    def check_and_settle_worthless_assets(self, threshold: float = 0.01) -> List[Asset]:
+        """Check for assets that have fallen below price threshold and settle them early.
+        
+        Args:
+            threshold: Price threshold below which assets are settled
+        
+        Returns:
+            List of assets that were settled due to price dropping below threshold
+        """
+        worthless_assets = self.get_worthless_assets(threshold=threshold)
+        
+        if not worthless_assets:
+            return []
+        
+        logger.info(f"Found {len(worthless_assets)} asset(s) below ${threshold:.2f} threshold")
+        
+        for asset in worthless_assets:
+            logger.warning(f"Auto-settling {asset.symbol} - price ${asset.current_price:.4f} below ${threshold:.2f} threshold")
+            # Expire with current (worthless) price as final price
+            asset.expire(final_price=asset.current_price)
+        
+        if worthless_assets:
+            db.session.commit()
+        
+        return worthless_assets
     
     def settle_expired_positions(self, expired_assets: List[Asset]) -> Dict[str, int]:
         """Settle all user positions in expired assets.
@@ -286,19 +326,30 @@ class AssetManager:
         """
         logger.info("Processing asset expirations...")
         
-        # Step 1: Check and expire assets
+        # Step 1: Check and expire assets that have passed their expiration time
         expired_assets = self.check_and_expire_assets()
+        
+        # Step 1.5: Check and settle assets that have fallen below worthless threshold
+        worthless_assets = self.check_and_settle_worthless_assets(threshold=0.01)
+        
+        # Combine both types of expired assets
+        all_expired = list(expired_assets)
+        if worthless_assets:
+            all_expired.extend(worthless_assets)
+            logger.info(f"Found {len(worthless_assets)} worthless asset(s) to settle early")
         
         stats: Dict[str, Any] = {
             'expired_assets': len(expired_assets),
+            'worthless_assets': len(worthless_assets),
+            'total_settled': len(all_expired),
             'settlement_stats': {},
             'maintenance_stats': {}
         }
         
         # Step 2: Settle positions
-        if expired_assets:
-            logger.info(f"Found {len(expired_assets)} expired assets")
-            settlement_stats = self.settle_expired_positions(expired_assets)
+        if all_expired:
+            logger.info(f"Found {len(all_expired)} expired/worthless assets (time expired: {len(expired_assets)}, worthless: {len(worthless_assets)})")
+            settlement_stats = self.settle_expired_positions(all_expired)
             stats['settlement_stats'] = settlement_stats
             
             # Emit settlement transactions AFTER database commit
@@ -335,7 +386,7 @@ class AssetManager:
             
             # Remove expired assets from price service
             if self.price_service and hasattr(self.price_service, 'fallback'):
-                for asset in expired_assets:
+                for asset in all_expired:
                     if asset.symbol in self.price_service.fallback.assets:
                         del self.price_service.fallback.assets[asset.symbol]
                         logger.info(f"Removed {asset.symbol} from price service")

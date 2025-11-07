@@ -1252,6 +1252,9 @@ def update_prices():
             # Get current prices from the price service
             current_prices = price_service.get_current_prices()
             
+            # Track assets that dropped below threshold
+            worthless_assets = []
+            
             # Enrich price data with expiration info
             enriched_prices = {}
             for asset in active_assets:
@@ -1260,6 +1263,11 @@ def update_prices():
                     
                     # Update database with current price
                     asset.current_price = price
+                    
+                    # Check if asset has fallen below worthless threshold
+                    if price < 0.01:
+                        logger.warning(f"Asset {asset.symbol} dropped to ${price:.4f} - will be auto-settled")
+                        worthless_assets.append(asset)
                     
                     enriched_prices[asset.symbol] = {
                         'price': price,
@@ -1273,6 +1281,42 @@ def update_prices():
             
             # Commit price updates to database
             db.session.commit()
+            
+            # Process worthless assets immediately if any found
+            if worthless_assets:
+                logger.info(f"Immediately settling {len(worthless_assets)} worthless asset(s)")
+                
+                # Mark them as expired with their worthless price
+                for asset in worthless_assets:
+                    asset.expire(final_price=asset.current_price)
+                db.session.commit()
+                
+                # Settle positions
+                settlement_stats = asset_manager.settle_expired_positions(worthless_assets)
+                
+                # Remove from enriched prices since they're no longer active
+                for asset in worthless_assets:
+                    if asset.symbol in enriched_prices:
+                        del enriched_prices[asset.symbol]
+                    # Remove from price service
+                    if hasattr(price_service, 'fallback') and asset.symbol in price_service.fallback.assets:
+                        del price_service.fallback.assets[asset.symbol]
+                
+                # Notify clients about the settlement
+                socketio.emit('assets_updated', {
+                    'message': f"{len(worthless_assets)} asset(s) auto-settled (price below $0.01)",
+                    'stats': {
+                        'expired_assets': 0,
+                        'worthless_assets': len(worthless_assets),
+                        'total_settled': len(worthless_assets),
+                        'settlement_stats': settlement_stats
+                    }
+                })
+                
+                # Signal clients to refresh portfolio
+                socketio.emit('portfolio_refresh_needed', {})
+                
+                logger.info(f"Auto-settled {len(worthless_assets)} worthless assets")
             
             socketio.emit('price_update', enriched_prices)
             
