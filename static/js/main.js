@@ -3412,11 +3412,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Initialize expiry timestamps and styling for all assets
         updateMobileExpiry(mobileAssets, true);
         
-        updateMobileAssetDisplay();
+        // Update display without animations to prevent visual glitches
+        updateMobileAssetDisplay(true);
     }
 
-    function updateMobileAssetDisplay() {
+    function updateMobileAssetDisplay(skipAnimation = false) {
         const cards = mobileCarousel.querySelectorAll('.mobile-asset-card');
+        
+        // Temporarily disable transitions to prevent glitches during rebuild
+        if (skipAnimation) {
+            mobileCarousel.style.transition = 'none';
+            cards.forEach(card => {
+                card.style.transition = 'none';
+            });
+        }
         
         cards.forEach((card, index) => {
             card.classList.remove('active', 'prev', 'next');
@@ -3429,6 +3438,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.classList.add('next');
             }
         });
+
+        // Re-enable transitions after layout is complete
+        if (skipAnimation) {
+            // Use requestAnimationFrame to ensure layout is complete before re-enabling transitions
+            requestAnimationFrame(() => {
+                mobileCarousel.style.transition = '';
+                cards.forEach(card => {
+                    card.style.transition = '';
+                });
+            });
+        }
 
         // Update sell button state
         if (mobileSellBtn && mobileAssets[currentMobileAssetIndex]) {
