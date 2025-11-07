@@ -113,7 +113,7 @@ class PriceService:
                 time.sleep(1)  # Brief pause before retry
     
     def _update_prices(self):
-        """Update all asset prices using random walk."""
+        """Update all asset prices using geometric Brownian motion to ensure martingale property."""
         timestamp = time.time() * 1000  # JavaScript-compatible timestamp
         
         # Round timestamp to nearest second to avoid sub-second duplicates
@@ -124,21 +124,31 @@ class PriceService:
             if (data.get('last_update') == timestamp or
                 (len(data['history']) > 0 and data['history'][-1]['time'] == timestamp)):
                 continue
-                
+            
             # Get volatility from config or asset data
             volatility = data.get('volatility', 0.02)
             
-            # Apply random walk
-            change_percent = np.random.normal(0, volatility)
-            change_percent = np.clip(change_percent, -0.1, 0.1)  # Limit changes
-            new_price = data['price'] * (1 + change_percent)
+            # Use geometric Brownian motion with drift correction for martingale property
+            # S(t+dt) = S(t) * exp((mu - 0.5*sigma^2)*dt + sigma*sqrt(dt)*Z)
+            # For a martingale, mu = 0, so we get:
+            # S(t+dt) = S(t) * exp(-0.5*sigma^2*dt + sigma*sqrt(dt)*Z)
+            # where Z ~ N(0,1)
             
-            # Ensure price doesn't go negative
-            # data['price'] = max(new_price, 0.01)
-            # std_dev = np.sqrt(data['volatility'])
-            # change_percent = np.random.lognormal(-data['volatility']/2, std_dev)
-            # data['price'] *= change_percent
-            data['price'] = max(new_price, 0.0)  # Prevent negative prices
+            dt = 1.0  # 1 second time step
+            sigma = volatility
+            
+            # Generate random shock from standard normal
+            z = np.random.standard_normal()
+            
+            # Calculate multiplicative factor with drift correction
+            # The -0.5*sigma^2*dt term ensures E[S(t+dt)] = S(t)
+            log_return = -0.5 * sigma**2 * dt + sigma * np.sqrt(dt) * z
+            
+            # Update price using exponential (geometric Brownian motion)
+            new_price = data['price'] * np.exp(log_return)
+            
+            # Ensure price stays positive (shouldn't go negative with GBM, but safety check)
+            data['price'] = max(new_price, 0.0)
             data['last_update'] = timestamp
             
             # Add to history
