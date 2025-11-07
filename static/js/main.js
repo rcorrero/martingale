@@ -3520,12 +3520,18 @@ document.addEventListener('DOMContentLoaded', () => {
                                 return '$' + context.parsed.y.toFixed(2);
                             }
                         }
+                    },
+                    annotation: {
+                        annotations: {}
                     }
                 }
             }
         });
 
         mobileCharts.push({ symbol: asset.symbol, chart: chart });
+
+        // Update VWAP line if user has position
+        updateMobileVWAPLine(asset.symbol);
 
         // Load historical data with timeout
         const controller = new AbortController();
@@ -3560,6 +3566,53 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.warn(`Could not load history for ${asset.symbol}:`, error.message);
                 }
             });
+    }
+
+    function updateMobileVWAPLine(symbol) {
+        if (!isMobileView()) return;
+        
+        const chartObj = mobileCharts.find(c => c.symbol === symbol);
+        if (!chartObj || !chartObj.chart) return;
+        
+        const chart = chartObj.chart;
+        const vwap = calculateVWAP(symbol);
+        
+        // Only show VWAP line if user currently holds a position
+        if (vwap && userPortfolio.holdings && userPortfolio.holdings[symbol] > 0) {
+            chart.options.plugins.annotation.annotations.vwapLine = {
+                type: 'line',
+                yMin: vwap,
+                yMax: vwap,
+                borderColor: '#00d4ff', // Terminal cyan
+                borderWidth: 2,
+                borderDash: [8, 4],
+                label: {
+                    content: `VWAP: ${formatCurrencyLocale(vwap)}`,
+                    enabled: true,
+                    display: true,
+                    position: 'start', // Position at start for better visibility
+                    backgroundColor: 'rgba(0, 212, 255, 0.95)', // More opaque for better readability
+                    color: '#0a0e1a',
+                    font: {
+                        family: 'JetBrains Mono, Consolas, Monaco, monospace',
+                        size: 10, // Slightly larger for mobile
+                        weight: 700
+                    },
+                    padding: {
+                        top: 4,
+                        bottom: 4,
+                        left: 6,
+                        right: 6
+                    },
+                    borderRadius: 4,
+                    yAdjust: 0
+                }
+            };
+        } else {
+            // Remove VWAP line if no current position
+            delete chart.options.plugins.annotation.annotations.vwapLine;
+        }
+        chart.update('none');
     }
 
     function updateMobileAccountInfo() {
@@ -3773,6 +3826,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 chartObj.chart.update('none');
+                
+                // Update VWAP line for this symbol
+                updateMobileVWAPLine(symbol);
             }
         });
         
@@ -3839,6 +3895,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 positionEl.innerHTML = positionInfo;
             }
+        });
+        
+        // Update VWAP lines for all mobile charts
+        mobileCharts.forEach(chartObj => {
+            updateMobileVWAPLine(chartObj.symbol);
         });
     }
 
