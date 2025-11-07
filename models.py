@@ -274,10 +274,10 @@ class Asset(db.Model):
         # Using exponential distribution for average around 30 minutes
         if minutes_to_expiry is None:
             # Exponential distribution with mean ~25 minutes, clamped to range
-            lambda_param = 1.0 / 25.0
+            lambda_param = 1.0 / 10.0
             minutes_to_expiry = random.expovariate(lambda_param)
             # Clamp between 5 and 480 minutes
-            minutes_to_expiry = max(5, min(480, minutes_to_expiry))
+            minutes_to_expiry = max(5, min(30, minutes_to_expiry))
 
         expires_at = current_utc() + timedelta(minutes=minutes_to_expiry)
 
