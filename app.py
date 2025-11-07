@@ -421,11 +421,13 @@ def get_portfolio():
     related_asset_ids.update(t.asset_id for t in user_transactions if t.asset_id)
 
     asset_colors = {}
+    asset_lookup = {}
     if related_asset_ids:
         assets = Asset.query.filter(Asset.id.in_(related_asset_ids)).all()
         for asset in assets:
             if asset.symbol and asset.color:
                 asset_colors[asset.symbol] = asset.color
+            asset_lookup[asset.id] = asset
 
     transactions_payload = []
     for transaction in user_transactions:
@@ -451,11 +453,51 @@ def get_portfolio():
             'color': color
         })
     
+    # Calculate per-asset P&L
+    position_pnl = {}
+    try:
+        current_prices = price_service.get_current_prices()
+        holdings_map = portfolio.get_holdings()
+        position_info_map = portfolio.get_position_info()
+        
+        for asset_id, quantity in holdings_map.items():
+            asset = asset_lookup.get(asset_id)
+            if not asset or quantity <= 0:
+                continue
+                
+            symbol = asset.symbol
+            pos_info = position_info_map.get(asset_id, {})
+            total_cost = float(pos_info.get('total_cost', 0.0))
+            total_quantity = float(pos_info.get('total_quantity', 0.0))
+            
+            # Get current price
+            price_data = current_prices.get(symbol, {})
+            current_price = float(price_data.get('price', asset.current_price) if isinstance(price_data, dict) else asset.current_price)
+            
+            # Calculate P&L
+            if total_quantity > 0:
+                avg_cost = total_cost / total_quantity
+                current_value = quantity * current_price
+                cost_basis = quantity * avg_cost
+                unrealized_pnl = current_value - cost_basis
+                unrealized_pnl_percent = (unrealized_pnl / cost_basis * 100) if cost_basis > 0 else 0.0
+                
+                position_pnl[symbol] = {
+                    'unrealized_pnl': unrealized_pnl,
+                    'unrealized_pnl_percent': unrealized_pnl_percent,
+                    'current_value': current_value,
+                    'cost_basis': cost_basis,
+                    'avg_cost': avg_cost
+                }
+    except Exception as e:
+        logger.error(f"Error calculating position P&L: {e}")
+    
     return jsonify({
         'user_id': current_user.id,
         'cash': portfolio.cash,
         'holdings': holdings_by_symbol,
         'position_info': position_info_by_symbol,
+        'position_pnl': position_pnl,
         'asset_colors': asset_colors,
         'transactions': transactions_payload
     })
@@ -1302,9 +1344,13 @@ def update_prices():
                     if hasattr(price_service, 'fallback') and asset.symbol in price_service.fallback.assets:
                         del price_service.fallback.assets[asset.symbol]
                 
+                # Build symbol list for notification
+                symbols = [asset.symbol for asset in worthless_assets]
+                symbols_str = ', '.join(symbols)
+                
                 # Notify clients about the settlement
                 socketio.emit('assets_updated', {
-                    'message': f"{len(worthless_assets)} asset(s) auto-settled (price below $0.01)",
+                    'message': f"{len(worthless_assets)} asset(s) auto-settled ({symbols_str})",
                     'stats': {
                         'expired_assets': 0,
                         'worthless_assets': len(worthless_assets),
@@ -1354,12 +1400,16 @@ def expiration_check_thread():
                     logger.info(f"Processed {stats['expired_assets']} expired assets")
                     logger.info(f"Settled {stats.get('settlement_stats', {}).get('positions_settled', 0)} positions")
                     
+                    # Build symbol list for notification
+                    symbols = stats.get('expired_symbols', [])
+                    symbols_str = ', '.join(symbols) if symbols else ''
+                    
                     # Give database a moment to ensure all commits are complete
                     time.sleep(0.5)
                     
                     # Notify all connected clients about settlements
                     socketio.emit('assets_updated', {
-                        'message': f"{stats['expired_assets']} asset(s) expired and settled",
+                        'message': f"{stats['expired_assets']} asset(s) expired and settled ({symbols_str})",
                         'stats': stats
                     })
                     

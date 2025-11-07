@@ -2122,6 +2122,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Helper function to detect mobile view
     function isMobileView() {
+        // Use desktop layout in landscape orientation on mobile devices
+        if (window.innerWidth <= 768 && window.matchMedia("(orientation: landscape)").matches) {
+            return false;
+        }
         return window.innerWidth <= 768;
     }
 
@@ -2557,6 +2561,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                 const currentPrice = assets[symbol]?.price || previousPrices[symbol];
                                 const marketValue = currentPrice ? quantity * currentPrice : null;
                                 
+                                // Get P&L data if available
+                                const pnlData = portfolio.position_pnl && portfolio.position_pnl[symbol];
+                                const unrealizedPnl = pnlData ? pnlData.unrealized_pnl : null;
+                                const unrealizedPnlPercent = pnlData ? pnlData.unrealized_pnl_percent : null;
+                                
                                 // Build the holding display with clear labels
                                 const quantityDisplayValue = formatQuantity(quantity);
                 const quantityDisplay = `<span class="holding-metric">
@@ -2573,11 +2582,23 @@ document.addEventListener('DOMContentLoaded', () => {
                                         <span class="holding-label">VWAP:</span>
                                         <span class="holding-value holding-value-vwap" title="${vwapFormatted}">${vwapFormatted}</span>
                                     </span>` : '';
+                                
+                                // P&L display with color coding
+                                let pnlDisplay = '';
+                                if (unrealizedPnl !== null && unrealizedPnl !== undefined) {
+                                    const pnlFormatted = formatCurrencyLocale(unrealizedPnl);
+                                    const pnlPercentFormatted = formatPercentage(unrealizedPnlPercent);
+                                    const pnlClass = unrealizedPnl >= 0 ? 'positive' : 'negative';
+                                    pnlDisplay = `<span class="holding-metric">
+                                        <span class="holding-label">P&L:</span>
+                                        <span class="holding-value holding-value-pnl ${pnlClass}" title="${pnlFormatted} (${pnlPercentFormatted})">${pnlFormatted} (${pnlPercentFormatted})</span>
+                                    </span>`;
+                                }
 
                                 const item = `<li data-symbol="${symbol}" style="border-left: 3px solid ${color}; padding-left: 12px; background: rgba(0, 0, 0, 0.3);">
                                     <div class="holding-row">
                                         <span class="symbol-badge" style="background-color: ${color};">${symbol}</span>
-                                        ${quantityDisplay}${marketValueDisplay}${vwapDisplay}
+                                        ${quantityDisplay}${marketValueDisplay}${vwapDisplay}${pnlDisplay}
                                     </div>
                                 </li>`;
                                 holdingsList.innerHTML += item;
@@ -2614,6 +2635,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Update pie chart
         createOrUpdatePortfoliePieChart();
+        
+        // Update mobile P&L displays
+        updateMobilePnL();
         
         // Update mobile sell button state if on mobile view
         if (isMobileView() && mobileSellBtn && mobileAssets[currentMobileAssetIndex]) {
@@ -2867,12 +2891,12 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Show final result
             if (failCount === 0) {
-                tradeMessage.textContent = `Successfully sold all ${successCount} positions!`;
+                tradeMessage.textContent = `Successfully sold all ${successCount} position(s)!`;
                 tradeMessage.style.color = '#7dda58'; // High contrast green
                 tradeMessage.style.background = 'rgba(0, 255, 136, 0.1)';
                 tradeMessage.style.border = '1px solid rgba(0, 255, 136, 0.3)';
             } else {
-                tradeMessage.textContent = `Sold ${successCount}/${positions.length} positions (${failCount} failed)`;
+                tradeMessage.textContent = `Sold ${successCount}/${positions.length} position(s) (${failCount} failed)`;
                 tradeMessage.style.color = '#fbbf24'; // Terminal warning yellow
                 tradeMessage.style.background = 'rgba(251, 191, 36, 0.1)';
                 tradeMessage.style.border = '1px solid rgba(251, 191, 36, 0.3)';
@@ -3292,11 +3316,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 expiryText = hours > 0 ? `Expires in ${hours}h ${minutes}m` : `Expires in ${minutes}m`;
             }
         }
+        
+        // Check if user has a position in this asset
+        const hasPosition = userPortfolio.holdings && userPortfolio.holdings[asset.symbol] > 0;
+        let positionHtml = '';
+        
+        if (hasPosition) {
+            const quantity = userPortfolio.holdings[asset.symbol];
+            const vwap = calculateVWAP(asset.symbol);
+            const pnlData = userPortfolio.position_pnl && userPortfolio.position_pnl[asset.symbol];
+            
+            let positionInfo = `<div class="mobile-asset-position" id="mobile-position-${asset.symbol}">`;
+            positionInfo += `<span class="mobile-position-label">Position:</span> <span class="mobile-position-qty">${formatQuantity(quantity)}</span>`;
+            
+            if (vwap) {
+                positionInfo += ` <span class="mobile-position-separator">|</span> <span class="mobile-position-label">VWAP:</span> <span class="mobile-position-vwap">${formatCurrencyLocale(vwap)}</span>`;
+            }
+            
+            if (pnlData) {
+                const unrealizedPnl = pnlData.unrealized_pnl;
+                const unrealizedPnlPercent = pnlData.unrealized_pnl_percent;
+                const pnlClass = unrealizedPnl >= 0 ? 'positive' : 'negative';
+                const pnlFormatted = formatCurrencyLocale(unrealizedPnl);
+                const pnlPercentFormatted = formatPercentage(unrealizedPnlPercent);
+                positionInfo += ` <span class="mobile-position-separator">|</span> <span class="mobile-position-label">P&L:</span> <span class="mobile-position-pnl ${pnlClass}">${pnlFormatted} (${pnlPercentFormatted})</span>`;
+            }
+            
+            positionInfo += `</div>`;
+            positionHtml = positionInfo;
+        }
 
         card.innerHTML = `
             <div class="mobile-asset-header">
                 <div class="mobile-asset-symbol">${asset.symbol}</div>
                 <div class="mobile-asset-price" id="mobile-price-${asset.symbol}">$${asset.price ? asset.price.toFixed(2) : '0.00'}</div>
+                ${positionHtml}
                 <div class="mobile-asset-expiry" id="mobile-expiry-${asset.symbol}">${expiryText}</div>
             </div>
             <div class="mobile-asset-chart">
@@ -3727,6 +3781,66 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function updateMobilePnL() {
+        if (!isMobileView()) return;
+
+        // Iterate through all assets and update position info
+        mobileAssets.forEach(asset => {
+            const positionEl = document.getElementById(`mobile-position-${asset.symbol}`);
+            const hasPosition = userPortfolio.holdings && userPortfolio.holdings[asset.symbol] > 0;
+            
+            // If position element exists but user no longer has position, remove it
+            if (positionEl && !hasPosition) {
+                positionEl.remove();
+                return;
+            }
+            
+            // If user has position but element doesn't exist, recreate the card
+            if (hasPosition && !positionEl) {
+                // Find the card and regenerate it
+                const cards = document.querySelectorAll('.mobile-asset-card');
+                cards.forEach((card, index) => {
+                    const symbolEl = card.querySelector('.mobile-asset-symbol');
+                    if (symbolEl && symbolEl.textContent === asset.symbol) {
+                        const newCard = createMobileAssetCard(asset, index);
+                        card.replaceWith(newCard);
+                        if (index === currentMobileAssetIndex) {
+                            const canvas = newCard.querySelector(`#mobile-chart-${asset.symbol}`);
+                            if (canvas) {
+                                createMobileAssetChart(canvas, asset);
+                            }
+                        }
+                    }
+                });
+                return;
+            }
+            
+            // Update existing position element
+            if (positionEl && hasPosition) {
+                const quantity = userPortfolio.holdings[asset.symbol];
+                const vwap = calculateVWAP(asset.symbol);
+                const pnlData = userPortfolio.position_pnl && userPortfolio.position_pnl[asset.symbol];
+                
+                let positionInfo = `<span class="mobile-position-label">Position:</span> <span class="mobile-position-qty">${formatQuantity(quantity)}</span>`;
+                
+                if (vwap) {
+                    positionInfo += ` <span class="mobile-position-separator">|</span> <span class="mobile-position-label">VWAP:</span> <span class="mobile-position-vwap">${formatCurrencyLocale(vwap)}</span>`;
+                }
+                
+                if (pnlData) {
+                    const unrealizedPnl = pnlData.unrealized_pnl;
+                    const unrealizedPnlPercent = pnlData.unrealized_pnl_percent;
+                    const pnlClass = unrealizedPnl >= 0 ? 'positive' : 'negative';
+                    const pnlFormatted = formatCurrencyLocale(unrealizedPnl);
+                    const pnlPercentFormatted = formatPercentage(unrealizedPnlPercent);
+                    positionInfo += ` <span class="mobile-position-separator">|</span> <span class="mobile-position-label">P&L:</span> <span class="mobile-position-pnl ${pnlClass}">${pnlFormatted} (${pnlPercentFormatted})</span>`;
+                }
+                
+                positionEl.innerHTML = positionInfo;
+            }
+        });
+    }
+
     function updateMobileExpiry(assets, forceUpdate = false) {
         if (!isMobileView()) return;
 
@@ -3954,9 +4068,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Show final result
         if (failCount === 0) {
-            showNotification(`Successfully sold all ${successCount} positions!`, 'success');
+            showNotification(`Successfully sold all ${successCount} position(s)!`, 'success');
         } else {
-            showNotification(`Sold ${successCount}/${positions.length} positions (${failCount} failed)`, 'warning');
+            showNotification(`Sold ${successCount}/${positions.length} position(s) (${failCount} failed)`, 'warning');
         }
     }
 

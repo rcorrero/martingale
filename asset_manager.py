@@ -338,9 +338,15 @@ class AssetManager:
             all_expired.extend(worthless_assets)
             logger.info(f"Found {len(worthless_assets)} worthless asset(s) to settle early")
         
+        # Build lists of symbols for each category
+        expired_symbols = [asset.symbol for asset in expired_assets]
+        worthless_symbols = [asset.symbol for asset in worthless_assets] if worthless_assets else []
+        
         stats: Dict[str, Any] = {
             'expired_assets': len(expired_assets),
+            'expired_symbols': expired_symbols,
             'worthless_assets': len(worthless_assets),
+            'worthless_symbols': worthless_symbols,
             'total_settled': len(all_expired),
             'settlement_stats': {},
             'maintenance_stats': {}
