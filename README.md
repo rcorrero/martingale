@@ -219,13 +219,19 @@ Flags such as `--no-reset`, `--skip-price-seed`, or `--skip-asset-seed` let you 
 ⚠️ **Important**: This application implements multiple security features for production use.
 
 ### Implemented Security Features
+- ✅ **Input Validation** (Phase 1.1 - Production Ready)
+  - Comprehensive validation module with Decimal precision for financial calculations
+  - Symbol validation with SQL injection protection
+  - Quantity/price bounds checking (prevents negative, infinity, NaN values)
+  - Trade value limits to prevent overflow attacks
+  - Database CHECK constraints as defense-in-depth layer
 - ✅ Password length policy (8+ chars, whitespace-only passwords rejected)
 - ✅ Username validation and sanitization
 - ✅ Rate limiting on login attempts (5 attempts per 5 minutes)
 - ✅ Password hashing with scrypt algorithm
 - ✅ Session security (HttpOnly, SameSite, timeout)
 - ✅ CSRF protection on all forms
-- ✅ SQL injection prevention via SQLAlchemy ORM
+- ✅ SQL injection prevention via SQLAlchemy ORM and validators
 - ✅ XSS protection with secure cookie configuration
 
 ### For Production Deployment

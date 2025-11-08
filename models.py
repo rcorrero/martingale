@@ -51,6 +51,12 @@ class Portfolio(db.Model):
     position_info = db.Column(db.Text, default='{}')  # JSON string of position info
     updated_at = db.Column(db.DateTime, default=current_utc, onupdate=current_utc)
     
+    # Database constraints for data integrity
+    __table_args__ = (
+        db.CheckConstraint('cash >= 0', name='check_cash_non_negative'),
+        db.CheckConstraint('cash <= 100000000000', name='check_cash_reasonable'),
+    )
+    
     @staticmethod
     def _normalize_asset_id(raw_key):
         """Convert stored key (id or legacy symbol) into an asset id."""
@@ -170,6 +176,14 @@ class Transaction(db.Model):
 
     # Relationships
     asset = db.relationship('Asset', back_populates='transactions', lazy='joined')
+    
+    # Database constraints for data integrity
+    __table_args__ = (
+        db.CheckConstraint('quantity > 0', name='check_positive_quantity'),
+        db.CheckConstraint('price >= 0', name='check_non_negative_price'),
+        db.CheckConstraint('total_cost >= 0', name='check_non_negative_cost'),
+        db.CheckConstraint("type IN ('buy', 'sell', 'settlement')", name='check_valid_type'),
+    )
 
     @property
     def symbol(self):
@@ -230,6 +244,15 @@ class Asset(db.Model):
     # Relationships
     settlements = db.relationship('Settlement', back_populates='asset', cascade='all, delete-orphan')
     transactions = db.relationship('Transaction', back_populates='asset', cascade='all, delete-orphan')
+    
+    # Database constraints for data integrity
+    __table_args__ = (
+        db.CheckConstraint('initial_price > 0', name='check_positive_initial_price'),
+        db.CheckConstraint('current_price >= 0', name='check_non_negative_current_price'),
+        db.CheckConstraint('volatility >= 0', name='check_non_negative_volatility'),
+        db.CheckConstraint('volatility <= 1', name='check_volatility_max'),
+        db.CheckConstraint('final_price IS NULL OR final_price >= 0', name='check_non_negative_final_price'),
+    )
     
     # Color palette for random assignment
     COLOR_PALETTE = [
@@ -372,6 +395,13 @@ class Settlement(db.Model):
     # Relationship
     user = db.relationship('User', backref='settlements')
     asset = db.relationship('Asset', back_populates='settlements', lazy='joined')
+    
+    # Database constraints for data integrity
+    __table_args__ = (
+        db.CheckConstraint('quantity > 0', name='check_positive_settlement_quantity'),
+        db.CheckConstraint('settlement_price >= 0', name='check_non_negative_settlement_price'),
+        db.CheckConstraint('settlement_value >= 0', name='check_non_negative_settlement_value'),
+    )
     
     @property
     def symbol(self):

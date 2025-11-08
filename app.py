@@ -22,6 +22,15 @@ from config import config
 from price_client import HybridPriceService
 from models import db, User, Portfolio, Transaction, PriceData, Asset, Settlement, current_utc
 from asset_manager import AssetManager
+from validators import (
+    ValidationError as InputValidationError,
+    validate_trade,
+    SymbolValidator,
+    TradeValidator,
+    PortfolioValidator,
+    QueryValidator,
+    safe_float_to_decimal
+)
 
 # Configure logging
 if os.environ.get('FLASK_ENV') == 'production':
@@ -402,11 +411,25 @@ def about():
 @app.route('/api/portfolio', methods=['GET'])
 @login_required
 def get_portfolio():
+    # Validate pagination parameters
+    try:
+        raw_limit = request.args.get('limit', 200, type=int) or 200
+        transaction_limit = QueryValidator.validate_limit(raw_limit, max_limit=500)
+    except InputValidationError as ve:
+        logger.warning(f"Invalid limit parameter for user {current_user.id}: {ve}")
+        return jsonify({'error': f'Invalid limit: {str(ve)}'}), 400
+    
     portfolio = get_user_portfolio(current_user)
+    
+    # Validate portfolio cash balance
+    try:
+        PortfolioValidator.validate_cash_balance(safe_float_to_decimal(portfolio.cash))
+    except InputValidationError as ve:
+        logger.error(f"Invalid cash balance for user {current_user.id}: cash={portfolio.cash}, error={ve}")
+        # Don't fail the request, but log the issue
+    
     holdings_by_symbol = portfolio.get_holdings_by_symbol()
     position_info_by_symbol = portfolio.get_position_info_by_symbol()
-    transaction_limit = request.args.get('limit', 200, type=int) or 200
-    transaction_limit = max(1, min(transaction_limit, 500))
 
     user_transactions = (
         Transaction.query
@@ -662,8 +685,11 @@ def get_performance():
 @login_required
 def get_performance_history():
     """Return a time series of portfolio value for the current user."""
-    limit = request.args.get('limit', 300, type=int) or 300
-    limit = max(50, min(limit, 1000))
+    # Validate pagination parameters
+    raw_limit = request.args.get('limit', 300, type=int) or 300
+    limit = QueryValidator.validate_limit(raw_limit, max_limit=1000)
+    # Ensure minimum of 50 for performance history
+    limit = max(50, limit)
 
     portfolio = get_user_portfolio(current_user)
     transactions = (Transaction.query
@@ -930,8 +956,13 @@ def debug_portfolio():
 @app.route('/api/transactions', methods=['GET'])
 @login_required
 def get_transactions():
-    limit = request.args.get('limit', 200, type=int) or 200
-    limit = max(1, min(limit, 500))
+    # Validate pagination parameters
+    try:
+        raw_limit = request.args.get('limit', 200, type=int) or 200
+        limit = QueryValidator.validate_limit(raw_limit, max_limit=500)
+    except InputValidationError as ve:
+        logger.warning(f"Invalid limit parameter for user {current_user.id}: {ve}")
+        return jsonify({'error': f'Invalid limit: {str(ve)}'}), 400
 
     transactions = (
         Transaction.query
@@ -963,8 +994,13 @@ def get_transactions():
 @login_required
 def get_all_transactions():
     """Return anonymized transactions across all accounts."""
-    limit = request.args.get('limit', 100, type=int) or 100
-    limit = max(1, min(limit, 200))
+    # Validate pagination parameters
+    try:
+        raw_limit = request.args.get('limit', 100, type=int) or 100
+        limit = QueryValidator.validate_limit(raw_limit, max_limit=200)
+    except InputValidationError as ve:
+        logger.warning(f"Invalid limit parameter in get_all_transactions: {ve}")
+        return jsonify({'error': f'Invalid limit: {str(ve)}'}), 400
 
     transactions = (Transaction.query
                     .order_by(Transaction.timestamp.desc())
@@ -986,8 +1022,13 @@ def get_all_transactions():
 @login_required
 def get_leaderboard():
     """Return users ranked by total profit & loss."""
-    limit = request.args.get('limit', 25, type=int) or 25
-    limit = max(1, min(limit, 100))
+    # Validate pagination parameters
+    try:
+        raw_limit = request.args.get('limit', 25, type=int) or 25
+        limit = QueryValidator.validate_limit(raw_limit, max_limit=100)
+    except InputValidationError as ve:
+        logger.warning(f"Invalid limit parameter in leaderboard: {ve}")
+        return jsonify({'error': f'Invalid limit: {str(ve)}'}), 400
 
     try:
         raw_prices = price_service.get_current_prices()
@@ -1084,7 +1125,15 @@ def get_assets_summary():
 @login_required
 def get_settlements():
     """Get settlement history for current user."""
-    settlements = Settlement.query.filter_by(user_id=current_user.id).order_by(Settlement.settled_at.desc()).limit(50).all()
+    # Validate pagination parameters
+    try:
+        raw_limit = request.args.get('limit', 50, type=int) or 50
+        limit = QueryValidator.validate_limit(raw_limit, max_limit=200)
+    except InputValidationError as ve:
+        logger.warning(f"Invalid limit parameter for user {current_user.id} in settlements: {ve}")
+        return jsonify({'error': f'Invalid limit: {str(ve)}'}), 400
+    
+    settlements = Settlement.query.filter_by(user_id=current_user.id).order_by(Settlement.settled_at.desc()).limit(limit).all()
     
     return jsonify([{
         'symbol': s.symbol,
@@ -1121,30 +1170,84 @@ def handle_trade(data):
         return
         
     try:
-        portfolio = get_user_portfolio(current_user)
-        symbol = data['symbol'].upper()
-        trade_type = data['type']
-        quantity = float(data['quantity'])
-        
-        # Validate asset is active
-        asset = Asset.query.filter_by(symbol=symbol, is_active=True).first()
-        if not asset:
+        # Step 1: INPUT VALIDATION - Validate all inputs before any processing
+        raw_symbol = data.get('symbol', '')
+        try:
+            raw_quantity = data.get('quantity', 0)
+            raw_type = data.get('type', '')
+            
+            # Validate trade type first (simple check)
+            validated_type = TradeValidator.validate_trade_type(raw_type)
+            
+            # Validate and sanitize symbol
+            validated_symbol = SymbolValidator.validate_symbol(raw_symbol)
+            
+            # Validate quantity (detailed validation)
+            validated_quantity = TradeValidator.validate_quantity(raw_quantity)
+            
+        except InputValidationError as ve:
+            logger.warning(f"Trade validation failed for user {current_user.id}: {ve}")
             emit('trade_confirmation', {
-                'success': False, 
-                'message': f'Asset {symbol} is not available for trading (may have expired)', 
-                'symbol': symbol
+                'success': False,
+                'message': f'Invalid input: {str(ve)}',
+                'symbol': raw_symbol
             })
             return
         
-        # Get current price from price service
-        current_prices = price_service.get_current_prices()
-        if symbol not in current_prices:
-            emit('trade_confirmation', {'success': False, 'message': f'Price not available for {symbol}', 'symbol': symbol})
+        # Step 2: ASSET VALIDATION - Check asset exists and is tradeable
+        asset = Asset.query.filter_by(symbol=validated_symbol, is_active=True).first()
+        if not asset:
+            emit('trade_confirmation', {
+                'success': False, 
+                'message': f'Asset {validated_symbol} is not available for trading (may have expired)', 
+                'symbol': validated_symbol
+            })
             return
-            
-        price = current_prices[symbol]['price']
-        cost = quantity * price
+        
+        # Step 3: PRICE VALIDATION - Get and validate current price
+        current_prices = price_service.get_current_prices()
+        if validated_symbol not in current_prices:
+            emit('trade_confirmation', {
+                'success': False,
+                'message': f'Price not available for {validated_symbol}',
+                'symbol': validated_symbol
+            })
+            return
+        
+        try:
+            validated_price = TradeValidator.validate_price(current_prices[validated_symbol]['price'])
+        except InputValidationError as ve:
+            logger.error(f"Invalid price from price service for {validated_symbol}: {ve}")
+            emit('trade_confirmation', {
+                'success': False,
+                'message': f'Invalid price for {validated_symbol}',
+                'symbol': validated_symbol
+            })
+            return
+        
+        # Step 4: TRADE VALUE VALIDATION - Calculate and validate total cost
+        try:
+            validated_cost = TradeValidator.validate_trade_value(validated_quantity, validated_price)
+        except InputValidationError as ve:
+            logger.warning(f"Trade value validation failed: {ve}")
+            emit('trade_confirmation', {
+                'success': False,
+                'message': str(ve),
+                'symbol': validated_symbol
+            })
+            return
+        
+        # Convert validated Decimal values back to float for database (temporary until full Decimal migration)
+        quantity = float(validated_quantity)
+        price = float(validated_price)
+        cost = float(validated_cost)
+        trade_type = validated_type
+        symbol = validated_symbol
+        
         timestamp = time.time() * 1000  # JavaScript-compatible timestamp
+        
+        # Step 5: Get portfolio (now safe to proceed)
+        portfolio = get_user_portfolio(current_user)
 
         # Get current holdings and position info
         holdings = portfolio.get_holdings()
@@ -1158,113 +1261,143 @@ def handle_trade(data):
             position_info[asset_id] = {'total_cost': 0.0, 'total_quantity': 0.0}
 
         if trade_type == 'buy':
-            if portfolio.cash >= cost:
-                portfolio.cash -= cost
-                holdings[asset_id] += quantity
-                
-                # Update position info for VWAP calculation
-                position_info[asset_id]['total_cost'] += cost
-                position_info[asset_id]['total_quantity'] += quantity
-                
-                # Update portfolio in database
-                portfolio.set_holdings(holdings)
-                portfolio.set_position_info(position_info)
-                
-                # Record transaction in database
-                transaction = Transaction(
-                    user_id=current_user.id,
-                    asset_id=asset.id,
-                    legacy_symbol=asset.symbol,
-                    timestamp=timestamp,
-                    type='buy',
-                    quantity=quantity,
-                    price=price,
-                    total_cost=cost
+            # Validate sufficient funds before executing buy
+            try:
+                PortfolioValidator.validate_sufficient_funds(
+                    safe_float_to_decimal(portfolio.cash),
+                    validated_cost
                 )
-                db.session.add(transaction)
-                db.session.commit()
-                
-                emit('trade_confirmation', {'success': True, 'message': f'Bought {quantity} {symbol}', 'symbol': symbol, 'type': 'buy', 'quantity': quantity})
-                emit('transaction_added', {
-                    'timestamp': timestamp,
-                    'symbol': symbol,
-                    'type': 'buy',
-                    'asset_id': asset.id,
-                    'quantity': quantity,
-                    'price': price,
-                    'total_cost': cost,
-                    'user_id': current_user.id,
-                    'color': asset.color
+            except InputValidationError as ve:
+                logger.warning(f"Insufficient funds for user {current_user.id}: cash={portfolio.cash}, cost={cost}")
+                emit('trade_confirmation', {
+                    'success': False, 
+                    'message': 'Insufficient funds', 
+                    'symbol': symbol, 
+                    'type': 'buy', 
+                    'quantity': quantity
                 })
-                socketio.emit('global_transaction_update', {
-                    'timestamp': int(timestamp),
-                    'symbol': symbol,
-                    'type': 'buy',
-                    'quantity': quantity,
-                    'price': price,
-                    'total_cost': cost,
-                    'user_id': current_user.id,
-                    'color': asset.color
-                })
-            else:
-                emit('trade_confirmation', {'success': False, 'message': 'Insufficient funds', 'symbol': symbol, 'type': 'buy', 'quantity': quantity})
+                return
+            
+            # Execute buy transaction
+            portfolio.cash -= cost
+            holdings[asset_id] += quantity
+            
+            # Update position info for VWAP calculation
+            position_info[asset_id]['total_cost'] += cost
+            position_info[asset_id]['total_quantity'] += quantity
+            
+            # Update portfolio in database
+            portfolio.set_holdings(holdings)
+            portfolio.set_position_info(position_info)
+            
+            # Record transaction in database
+            transaction = Transaction(
+                user_id=current_user.id,
+                asset_id=asset.id,
+                legacy_symbol=asset.symbol,
+                timestamp=timestamp,
+                type='buy',
+                quantity=quantity,
+                price=price,
+                total_cost=cost
+            )
+            db.session.add(transaction)
+            db.session.commit()
+            
+            emit('trade_confirmation', {'success': True, 'message': f'Bought {quantity} {symbol}', 'symbol': symbol, 'type': 'buy', 'quantity': quantity})
+            emit('transaction_added', {
+                'timestamp': timestamp,
+                'symbol': symbol,
+                'type': 'buy',
+                'asset_id': asset.id,
+                'quantity': quantity,
+                'price': price,
+                'total_cost': cost,
+                'user_id': current_user.id,
+                'color': asset.color
+            })
+            socketio.emit('global_transaction_update', {
+                'timestamp': int(timestamp),
+                'symbol': symbol,
+                'type': 'buy',
+                'quantity': quantity,
+                'price': price,
+                'total_cost': cost,
+                'user_id': current_user.id,
+                'color': asset.color
+            })
                 
         elif trade_type == 'sell':
-            if holdings[asset_id] >= quantity:
-                portfolio.cash += cost
-                holdings[asset_id] -= quantity
-                
-                # Update position info for VWAP calculation
-                if position_info[asset_id]['total_quantity'] > 0:
-                    # Calculate proportion of position being sold
-                    proportion_sold = quantity / position_info[asset_id]['total_quantity']
-                    cost_basis_sold = position_info[asset_id]['total_cost'] * proportion_sold
-                    
-                    position_info[asset_id]['total_cost'] -= cost_basis_sold
-                    position_info[asset_id]['total_quantity'] -= quantity
-                
-                # Update portfolio in database
-                portfolio.set_holdings(holdings)
-                portfolio.set_position_info(position_info)
-                
-                # Record transaction in database
-                transaction = Transaction(
-                    user_id=current_user.id,
-                    asset_id=asset.id,
-                    legacy_symbol=asset.symbol,
-                    timestamp=timestamp,
-                    type='sell',
-                    quantity=quantity,
-                    price=price,
-                    total_cost=cost
+            # Validate sufficient holdings before executing sell
+            try:
+                PortfolioValidator.validate_sufficient_holdings(
+                    safe_float_to_decimal(holdings[asset_id]),
+                    validated_quantity
                 )
-                db.session.add(transaction)
-                db.session.commit()
+            except InputValidationError as ve:
+                logger.warning(f"Insufficient holdings for user {current_user.id}: has={holdings[asset_id]}, needs={quantity}")
+                emit('trade_confirmation', {
+                    'success': False, 
+                    'message': 'Insufficient holdings', 
+                    'symbol': symbol, 
+                    'type': 'sell', 
+                    'quantity': quantity
+                })
+                return
+            
+            # Execute sell transaction
+            portfolio.cash += cost
+            holdings[asset_id] -= quantity
+            
+            # Update position info for VWAP calculation
+            if position_info[asset_id]['total_quantity'] > 0:
+                # Calculate proportion of position being sold
+                proportion_sold = quantity / position_info[asset_id]['total_quantity']
+                cost_basis_sold = position_info[asset_id]['total_cost'] * proportion_sold
                 
-                emit('trade_confirmation', {'success': True, 'message': f'Sold {quantity} {symbol}', 'symbol': symbol, 'type': 'sell', 'quantity': quantity})
-                emit('transaction_added', {
-                    'timestamp': timestamp,
-                    'symbol': symbol,
-                    'type': 'sell',
-                    'asset_id': asset.id,
-                    'quantity': quantity,
-                    'price': price,
-                    'total_cost': cost,
-                    'user_id': current_user.id,
-                    'color': asset.color
-                })
-                socketio.emit('global_transaction_update', {
-                    'timestamp': int(timestamp),
-                    'symbol': symbol,
-                    'type': 'sell',
-                    'quantity': quantity,
-                    'price': price,
-                    'total_cost': cost,
-                    'user_id': current_user.id,
-                    'color': asset.color
-                })
-            else:
-                emit('trade_confirmation', {'success': False, 'message': 'Insufficient holdings', 'symbol': symbol, 'type': 'sell', 'quantity': quantity})
+                position_info[asset_id]['total_cost'] -= cost_basis_sold
+                position_info[asset_id]['total_quantity'] -= quantity
+            
+            # Update portfolio in database
+            portfolio.set_holdings(holdings)
+            portfolio.set_position_info(position_info)
+            
+            # Record transaction in database
+            transaction = Transaction(
+                user_id=current_user.id,
+                asset_id=asset.id,
+                legacy_symbol=asset.symbol,
+                timestamp=timestamp,
+                type='sell',
+                quantity=quantity,
+                price=price,
+                total_cost=cost
+            )
+            db.session.add(transaction)
+            db.session.commit()
+            
+            emit('trade_confirmation', {'success': True, 'message': f'Sold {quantity} {symbol}', 'symbol': symbol, 'type': 'sell', 'quantity': quantity})
+            emit('transaction_added', {
+                'timestamp': timestamp,
+                'symbol': symbol,
+                'type': 'sell',
+                'asset_id': asset.id,
+                'quantity': quantity,
+                'price': price,
+                'total_cost': cost,
+                'user_id': current_user.id,
+                'color': asset.color
+            })
+            socketio.emit('global_transaction_update', {
+                'timestamp': int(timestamp),
+                'symbol': symbol,
+                'type': 'sell',
+                'quantity': quantity,
+                'price': price,
+                'total_cost': cost,
+                'user_id': current_user.id,
+                'color': asset.color
+            })
         
         # Emit portfolio update to the user
         emit('portfolio_update', {
