@@ -40,7 +40,7 @@ def remove_unique_constraint_sqlite(engine):
     with engine.connect() as conn:
         # Check if table exists
         inspector = inspect(engine)
-        if 'assets' not in inspector.get_table_names():
+        database_url = os.environ.get("DATABASE_URL")
             print("  ✓ Assets table doesn't exist yet, no migration needed")
             return
         
@@ -49,13 +49,17 @@ def remove_unique_constraint_sqlite(engine):
         conn.execute(text("""
             CREATE TABLE assets_new (
                 id INTEGER PRIMARY KEY,
-                symbol VARCHAR(10) NOT NULL,
-                initial_price FLOAT NOT NULL,
-                current_price FLOAT NOT NULL,
-                volatility FLOAT DEFAULT 0.02,
-                drift FLOAT DEFAULT 0.0,
-                color VARCHAR(7) NOT NULL,
-                created_at DATETIME NOT NULL,
+        if not database_url:
+            print("❌ DATABASE_URL environment variable not set.")
+            sys.exit(1)
+
+        # Always force conversion for Heroku compatibility
+        if database_url.startswith("postgres://"):
+            database_url = database_url.replace("postgres://", "postgresql+psycopg2://", 1)
+        elif database_url.startswith("postgresql://") and "+psycopg2" not in database_url:
+            # Add driver if missing
+            database_url = database_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
                 expires_at DATETIME NOT NULL,
                 is_active BOOLEAN DEFAULT 1 NOT NULL,
                 final_price FLOAT,
@@ -97,7 +101,7 @@ def remove_unique_constraint_postgresql(engine):
     """Remove UNIQUE constraint from asset.symbol in PostgreSQL."""
     print("Removing UNIQUE constraint from asset.symbol (PostgreSQL)")
     
-    with engine.connect() as conn:
+    with engine.begin() as conn:  # Use begin() for automatic transaction management
         # Check if table exists
         inspector = inspect(engine)
         if 'assets' not in inspector.get_table_names():
@@ -121,11 +125,35 @@ def remove_unique_constraint_postgresql(engine):
         
         if constraint_name:
             print(f"  - Dropping constraint: {constraint_name}")
-            conn.execute(text(f"ALTER TABLE assets DROP CONSTRAINT {constraint_name}"))
-            conn.commit()
+            conn.execute(text(f"ALTER TABLE assets DROP CONSTRAINT IF EXISTS {constraint_name}"))
             print("  ✓ UNIQUE constraint removed successfully")
         else:
-            print("  ✓ No UNIQUE constraint found (may have been removed already)")
+            # Try alternate approach - drop index if it exists
+            print("  - No named constraint found, checking for UNIQUE index...")
+            try:
+                result = conn.execute(text("""
+                    SELECT indexname 
+                    FROM pg_indexes 
+                    WHERE tablename = 'assets' 
+                    AND indexdef LIKE '%UNIQUE%' 
+                    AND indexname LIKE '%symbol%'
+                """))
+                
+                index_name = None
+                for row in result:
+                    index_name = row[0]
+                    break
+                
+                if index_name:
+                    print(f"  - Dropping UNIQUE index: {index_name}")
+                    conn.execute(text(f"DROP INDEX IF EXISTS {index_name}"))
+                    # Recreate as non-unique index
+                    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_assets_symbol ON assets (symbol)"))
+                    print("  ✓ UNIQUE constraint removed successfully")
+                else:
+                    print("  ✓ No UNIQUE constraint found (may have been removed already)")
+            except Exception as e:
+                print(f"  ✓ No UNIQUE constraint found (may have been removed already): {e}")
 
 
 def main():
@@ -142,6 +170,27 @@ def main():
         # Fall back to config
         app_config = config[config_name]
         database_url = app_config.SQLALCHEMY_DATABASE_URI
+    
+    # Heroku uses postgres:// but SQLAlchemy 1.4+ requires postgresql://
+    # Also handle the psycopg2 driver specification
+        database_url = os.environ.get("DATABASE_URL")
+        if not database_url:
+            print("❌ DATABASE_URL environment variable not set.")
+            sys.exit(1)
+
+        database_url = database_url.strip()
+        # Always force conversion for Heroku compatibility
+        if database_url.startswith("postgres://"):
+            print("[DEBUG] Converting postgres:// to postgresql+psycopg2://")
+            database_url = database_url.replace("postgres://", "postgresql+psycopg2://", 1)
+        elif database_url.startswith("postgresql://") and "+psycopg2" not in database_url:
+            print("[DEBUG] Adding +psycopg2 to postgresql:// URL")
+            database_url = database_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+        print(f"[DEBUG] Final database_url: {database_url}")
+        if database_url.startswith("postgres://"):
+            print("❌ DATABASE_URL is still using postgres:// after attempted conversion. Aborting.")
+            sys.exit(1)
     
     print(f"Environment: {config_name}")
     print(f"Database: {database_url.split('@')[-1] if '@' in database_url else 'SQLite'}\n")
