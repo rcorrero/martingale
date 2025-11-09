@@ -243,7 +243,7 @@ class Asset(db.Model):
     __tablename__ = 'assets'
     
     id = db.Column(db.Integer, primary_key=True)
-    symbol = db.Column(db.String(10), nullable=False, unique=True, index=True)
+    symbol = db.Column(db.String(10), nullable=False, index=True)  # Indexed but not unique (symbols can be reused)
     initial_price = db.Column(db.Float, nullable=False)
     current_price = db.Column(db.Float, nullable=False)
     volatility = db.Column(db.Float, default=0.02)
@@ -315,12 +315,26 @@ class Asset(db.Model):
     
     @staticmethod
     def generate_symbol(length=3):
-        """Generate a random symbol using uppercase letters."""
-        while True:
+        """Generate a random symbol using uppercase letters.
+        
+        Prefers unused symbols, but allows reuse of symbols from inactive assets
+        since there are only 17,576 possible 3-letter combinations.
+        
+        Returns:
+            str: A symbol string of specified length
+        """
+        max_attempts = 100  # Try to find unused symbol first
+        
+        for _ in range(max_attempts):
             symbol = ''.join(random.choices(string.ascii_uppercase, k=length))
-            # Check if symbol already exists
-            if not Asset.query.filter_by(symbol=symbol).first():
+            # Check if symbol exists for any ACTIVE asset
+            active_asset = Asset.query.filter_by(symbol=symbol, is_active=True).first()
+            if not active_asset:
                 return symbol
+        
+        # If we couldn't find an unused symbol after max_attempts,
+        # just return a random symbol (will reuse from inactive assets)
+        return ''.join(random.choices(string.ascii_uppercase, k=length))
     
     @staticmethod
     def create_new_asset(initial_price=100.0, volatility=None, drift=None, minutes_to_expiry=None):

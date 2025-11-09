@@ -171,12 +171,17 @@ Configuration automatically selected based on `FLASK_ENV` environment variable.
 - **Settlements**: Reference assets via `asset_id` foreign key
 - **Backward Compatibility**: Legacy `symbol` columns preserved for compatibility
 - **User Display**: Symbols shown in UI, but IDs used internally
+- **Symbol Reuse**: Symbols can be reused after assets expire (no UNIQUE constraint)
+  - Only 17,576 possible 3-letter combinations (26³)
+  - System prefers unused symbols but allows reuse for long-term operation
+  - Asset IDs prevent ambiguity even with duplicate symbols
 
 **Benefits**:
 - Unambiguous asset references (IDs never change)
 - Prevents race conditions from symbol reuse
 - Proper database foreign key relationships
 - Faster lookups via indexed integer primary keys
+- Sustainable long-term operation (no symbol exhaustion)
 
 ### System Components
 
@@ -224,7 +229,7 @@ The Martingale platform follows a modular architecture with clear separation of 
 │  │ username │  │ cash      │  │ symbol   │  │ asset_id(FK)│   │
 │  │ pass_hash│  │ holdings* │  │ price    │  │ quantity    │   │
 │  │ created  │  │ updated   │  │ expires  │  │ price       │   │
-│  └──────────┘  └───────────┘  │ volatility│ │ type        │   │
+│  └──────────┘  └───────────┘  │volatility│  │ type        │   │
 │                               │ drift    │  │ timestamp   │   │
 │                               │ is_active│  │ symbol**    │   │
 │  ┌──────────┐  ┌───────────┐  └──────────┘  └─────────────┘   │
@@ -717,6 +722,9 @@ python migrate_add_color.py
 
 # Update password hashing algorithm
 python migrate_password_hash.py
+
+# Remove UNIQUE constraint from asset.symbol (allows symbol reuse)
+python migrate_remove_symbol_unique.py
 ```
 
 #### Flask Shell Operations
