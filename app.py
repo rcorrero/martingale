@@ -1567,6 +1567,27 @@ def expiration_check_thread():
 # fixtures have a chance to create tables. Threads are therefore
 # started inside the __main__ block below.
 
+def start_background_threads():
+    """Start price update and expiration check background threads.
+    
+    This is called automatically when running with Gunicorn (production)
+    or when running app.py directly (development). Tests skip this.
+    """
+    if not app.config.get('TESTING', False):
+        logger.info("Starting background threads...")
+        price_thread = threading.Thread(target=price_update_thread, daemon=True)
+        price_thread.start()
+        logger.info("✓ Price update thread started")
+
+        expiration_thread = threading.Thread(target=expiration_check_thread, daemon=True)
+        expiration_thread.start()
+        logger.info("✓ Expiration check thread started")
+
+# Start background threads when loaded by Gunicorn (production)
+# This won't run during tests because TESTING=True is set in conftest.py
+if not app.config.get('TESTING', False):
+    start_background_threads()
+
 if __name__ == '__main__':
     # Initialize database tables
     with app.app_context():
@@ -1604,12 +1625,6 @@ if __name__ == '__main__':
     
     logger.info(f"Starting application on port {port}, debug={debug}")
     
-    # Start background threads only when running the app directly
-    price_thread = threading.Thread(target=price_update_thread, daemon=True)
-    price_thread.start()
-
-    expiration_thread = threading.Thread(target=expiration_check_thread, daemon=True)
-    expiration_thread.start()
-
+    # Background threads already started above (unless TESTING=True)
     # Run with appropriate settings for production vs development
     socketio.run(app, debug=debug, port=port, host='0.0.0.0')
