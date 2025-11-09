@@ -104,7 +104,7 @@ def remove_unique_constraint_postgresql(engine):
     with engine.begin() as conn:  # Use begin() for automatic transaction management
         # Check if table exists
         inspector = inspect(engine)
-        if 'assets' not in inspector.get_table_names():
+        if 'asset' not in inspector.get_table_names():
             print("  ✓ Assets table doesn't exist yet, no migration needed")
             return
         
