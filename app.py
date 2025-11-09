@@ -93,7 +93,8 @@ def ensure_transaction_asset_schema():
             if missing_transactions:
                 logger.info("Backfilling asset_id for %d transactions", len(missing_transactions))
                 for transaction in missing_transactions:
-                    asset = Asset.query.filter_by(symbol=transaction.symbol).order_by(Asset.created_at.desc()).first()
+                    # Use new helper method for consistent lookup
+                    asset = Asset.get_by_id_or_symbol(symbol=transaction.symbol)
                     if asset:
                         transaction.asset_id = asset.id
                 db.session.commit()
@@ -147,7 +148,8 @@ def ensure_settlement_asset_schema():
                 for settlement in missing_asset_ids:
                     legacy_symbol = settlement.legacy_symbol
                     if legacy_symbol:
-                        asset = Asset.query.filter_by(symbol=legacy_symbol).order_by(Asset.created_at.desc()).first()
+                        # Use new helper method for consistent lookup
+                        asset = Asset.get_by_id_or_symbol(symbol=legacy_symbol)
                         if asset:
                             settlement.asset_id = asset.id
 
@@ -782,7 +784,8 @@ def get_performance_history():
         if not asset_id and transaction.legacy_symbol:
             asset = asset_by_symbol.get(transaction.legacy_symbol)
             if not asset:
-                asset = Asset.query.filter_by(symbol=transaction.legacy_symbol).order_by(Asset.created_at.desc()).first()
+                # Use new helper method for consistent lookup
+                asset = Asset.get_by_id_or_symbol(symbol=transaction.legacy_symbol)
                 if asset:
                     asset_by_id[asset.id] = asset
                     if asset.symbol:

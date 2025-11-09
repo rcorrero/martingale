@@ -120,6 +120,20 @@ class Portfolio(db.Model):
         id_to_symbol = {asset.id: asset.symbol for asset in assets if asset.symbol}
         return {id_to_symbol[asset_id]: holdings[asset_id] for asset_id in holdings if asset_id in id_to_symbol}
 
+    def get_asset_from_holdings(self, asset_id):
+        """Safely retrieve asset from holdings by ID.
+        
+        Args:
+            asset_id: Integer asset ID
+            
+        Returns:
+            Asset object or None if not found or not in holdings
+        """
+        holdings = self.get_holdings_map()
+        if asset_id not in holdings:
+            return None
+        return Asset.query.get(asset_id)
+
     def get_position_info_map(self):
         """Return position metadata keyed by asset id."""
         raw = json.loads(self.position_info) if self.position_info else {}
@@ -266,6 +280,38 @@ class Asset(db.Model):
     def get_random_color():
         """Get a random color from the palette."""
         return random.choice(Asset.COLOR_PALETTE)
+    
+    @staticmethod
+    def get_by_id_or_symbol(asset_id=None, symbol=None, active_only=False):
+        """Safely get asset by ID (preferred) or symbol (fallback).
+        
+        Args:
+            asset_id: Integer asset ID (preferred lookup method)
+            symbol: String asset symbol (fallback for backward compatibility)
+            active_only: If True, only return active assets
+            
+        Returns:
+            Asset object or None if not found
+            
+        Note:
+            Always prefer ID lookup when available. Symbol lookup returns
+            the most recent asset with that symbol for backward compatibility,
+            but this may not be the correct asset if symbols are reused.
+        """
+        if asset_id is not None:
+            asset = Asset.query.get(asset_id)
+            if asset and (not active_only or asset.is_active):
+                return asset
+            return None
+        
+        if symbol is not None:
+            query = Asset.query.filter_by(symbol=symbol)
+            if active_only:
+                query = query.filter_by(is_active=True)
+            # For backward compatibility, return most recent asset with this symbol
+            return query.order_by(Asset.created_at.desc()).first()
+        
+        return None
     
     @staticmethod
     def generate_symbol(length=3):

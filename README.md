@@ -162,6 +162,22 @@ Configuration automatically selected based on `FLASK_ENV` environment variable.
 
 ## Architecture
 
+### Data Model Design
+
+**Asset Identification**: The system uses **integer asset IDs** as the primary reference for all internal operations:
+
+- **Holdings**: Stored as `{asset_id: quantity}` JSON mapping (not by symbol)
+- **Transactions**: Reference assets via `asset_id` foreign key
+- **Settlements**: Reference assets via `asset_id` foreign key
+- **Backward Compatibility**: Legacy `symbol` columns preserved for compatibility
+- **User Display**: Symbols shown in UI, but IDs used internally
+
+**Benefits**:
+- Unambiguous asset references (IDs never change)
+- Prevents race conditions from symbol reuse
+- Proper database foreign key relationships
+- Faster lookups via indexed integer primary keys
+
 ### System Components
 
 The Martingale platform follows a modular architecture with clear separation of concerns:
@@ -204,17 +220,18 @@ The Martingale platform follows a modular architecture with clear separation of 
 │  ┌──────────┐  ┌───────────┐  ┌──────────┐  ┌─────────────┐   │
 │  │  Users   │  │ Portfolio │  │  Assets  │  │Transactions │   │
 │  ├──────────┤  ├───────────┤  ├──────────┤  ├─────────────┤   │
-│  │ id       │  │ user_id   │  │ symbol   │  │ user_id     │   │
-│  │ username │  │ cash      │  │ price    │  │ asset_id    │   │
-│  │ pass_hash│  │ holdings  │  │ expires  │  │ quantity    │   │
-│  │ created  │  │ updated   │  │ volatility│  │ price       │   │
-│  └──────────┘  └───────────┘  │ drift    │  │ type        │   │
-│                                │ is_active│  │ timestamp   │   │
+│  │ id (PK)  │  │ user_id   │  │ id (PK)  │  │ user_id     │   │
+│  │ username │  │ cash      │  │ symbol   │  │ asset_id(FK)│   │
+│  │ pass_hash│  │ holdings* │  │ price    │  │ quantity    │   │
+│  │ created  │  │ updated   │  │ expires  │  │ price       │   │
+│  └──────────┘  └───────────┘  │ volatility│  │ type        │   │
+│                                │ drift    │  │ timestamp   │   │
+│                                │ is_active│  │ symbol**    │   │
 │  ┌──────────┐  ┌───────────┐  └──────────┘  └─────────────┘   │
 │  │PriceData │  │Settlement │                                   │
 │  ├──────────┤  ├───────────┤  SQLite (dev) / PostgreSQL (prod)│
-│  │ symbol   │  │ user_id   │                                   │
-│  │ current  │  │ asset_id  │                                   │
+│  │ symbol   │  │ user_id   │  *holdings: {asset_id: quantity} │
+│  │ current  │  │ asset_id  │  **symbol: legacy compatibility  │
 │  │ history  │  │ quantity  │                                   │
 │  │ updated  │  │ price     │                                   │
 │  └──────────┘  └───────────┘                                   │
@@ -260,6 +277,10 @@ The application runs two daemon threads for continuous operation:
 - **SQLite**: Development and testing
 - **PostgreSQL**: Production deployment (Heroku compatible)
 - **Migrations**: Automated schema updates with backward compatibility
+- **Asset ID Consistency**: All internal operations use integer asset IDs for unambiguous references
+  - Holdings stored by asset ID (not symbol)
+  - Transactions/settlements reference assets via foreign keys
+  - Backward compatible with legacy symbol-based data
 
 ### Pricing System
 - **HybridPriceService**: Dual-mode price generation
@@ -708,12 +729,20 @@ flask shell
 >>> Asset.query.filter_by(is_active=True).count()
 16
 >>> 
->>> # View user portfolios
->>> Portfolio.query.all()
+>>> # Look up asset by ID (preferred) or symbol (fallback)
+>>> asset = Asset.get_by_id_or_symbol(asset_id=42)
+>>> asset = Asset.get_by_id_or_symbol(symbol='XYZ')  # Fallback
+>>> 
+>>> # View user portfolios (holdings use asset IDs)
+>>> portfolio = Portfolio.query.first()
+>>> holdings = portfolio.get_holdings_map()  # {asset_id: quantity}
+>>> 
+>>> # Get asset from user's holdings
+>>> asset = portfolio.get_asset_from_holdings(asset_id=42)
 >>> 
 >>> # Force expire an asset (for testing)
 >>> from datetime import datetime, timedelta, timezone
->>> asset = Asset.query.filter_by(symbol='XYZ').first()
+>>> asset = Asset.get_by_id_or_symbol(symbol='XYZ')
 >>> asset.expires_at = datetime.now(timezone.utc).replace(tzinfo=None)
 >>> db.session.commit()
 ```
@@ -971,6 +1000,7 @@ curl http://localhost:5001/health
 - **[MIGRATION_EXPIRING_ASSETS.md](MIGRATION_EXPIRING_ASSETS.md)** - Migration guide (legacy → expiring assets)
 - **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick API reference
 - **[MOBILE_VWAP_FEATURE.md](MOBILE_VWAP_FEATURE.md)** - Mobile UI VWAP implementation
+- **[ASSET_ID_CONSISTENCY.md](ASSET_ID_CONSISTENCY.md)** - Asset ID usage and backward compatibility
 
 ## License
 
