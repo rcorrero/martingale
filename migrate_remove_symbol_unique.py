@@ -142,17 +142,21 @@ def main():
         # Fall back to config
         app_config = config[config_name]
         database_url = app_config.SQLALCHEMY_DATABASE_URI
-    
+
+    # Heroku uses 'postgres://' but SQLAlchemy requires 'postgresql://'
+    if database_url.startswith('postgres://'):
+        database_url = 'postgresql://' + database_url[len('postgres://'):]
+
     print(f"Environment: {config_name}")
     print(f"Database: {database_url.split('@')[-1] if '@' in database_url else 'SQLite'}\n")
-    
+
     # Create engine
     engine = create_engine(database_url)
-    
+
     # Determine database type and run appropriate migration
     if 'sqlite' in database_url.lower():
         remove_unique_constraint_sqlite(engine)
-    elif 'postgresql' in database_url.lower() or 'postgres' in database_url.lower():
+    elif 'postgresql' in database_url.lower():
         remove_unique_constraint_postgresql(engine)
     else:
         print(f"❌ Unsupported database type: {database_url}")
