@@ -24,8 +24,8 @@ def add_short_expiry_asset():
             
             asset = Asset(
                 symbol=symbol,
-                initial_price=0.011,
-                current_price=0.011,
+                initial_price=1.0,
+                current_price=1.0,
                 volatility=0.05,  # 5% volatility
                 color=Asset.get_random_color(),
                 expires_at=expires_at,
