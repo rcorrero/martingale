@@ -185,38 +185,38 @@ The Martingale platform follows a modular architecture with clear separation of 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Client Browser                           │
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │   HTML/CSS  │  │ JavaScript   │  │   Chart.js           │  │
-│  │  Templates  │  │   (main.js)  │  │   Visualizations     │  │
-│  └─────────────┘  └──────────────┘  └──────────────────────┘  │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────────┐    │
+│  │   HTML/CSS  │  │ JavaScript   │  │   Chart.js           │    │
+│  │  Templates  │  │   (main.js)  │  │   Visualizations     │    │
+│  └─────────────┘  └──────────────┘  └──────────────────────┘    │
 └──────────────────────┬──────────────────────────────────────────┘
                        │ HTTP/WebSocket
 ┌──────────────────────┴──────────────────────────────────────────┐
 │                      Flask Application                          │
 │  ┌────────────────────────────────────────────────────────────┐ │
-│  │                       app.py                                │ │
+│  │                       app.py                               │ │
 │  │  • WebSocket event handlers (SocketIO)                     │ │
 │  │  • REST API endpoints                                      │ │
 │  │  • Authentication & session management (Flask-Login)       │ │
 │  │  • Background threads (price updates, expiration checks)   │ │
 │  └────────────────────────────────────────────────────────────┘ │
-│  ┌────────────────────┐    ┌─────────────────────────────────┐ │
-│  │  AssetManager      │    │     PriceClient                 │ │
-│  │  • Lifecycle mgmt  │    │     • Hybrid price service      │ │
-│  │  • Expiration      │◄───┤     • API client + fallback     │ │
-│  │  • Settlement      │    │     • GBM price generation      │ │
-│  │  • Pool maint.     │    └─────────────────────────────────┘ │
+│  ┌────────────────────┐    ┌─────────────────────────────────┐  │
+│  │  AssetManager      │    │     PriceClient                 │  │
+│  │  • Lifecycle mgmt  │    │     • Hybrid price service      │  │
+│  │  • Expiration      │◄───┤     • API client + fallback     │  │
+│  │  • Settlement      │    │     • GBM price generation      │  │
+│  │  • Pool maint.     │    └─────────────────────────────────┘  │
 │  └────────────────────┘                                         │
 │  ┌────────────────────────────────────────────────────────────┐ │
 │  │                    Validators                              │ │
 │  │  • TradeValidator    • SymbolValidator                     │ │
 │  │  • PortfolioValidator • QueryValidator                     │ │
-│  │  • Decimal precision  • SQL injection protection          │ │
+│  │  • Decimal precision  • SQL injection protection           │ │
 │  └────────────────────────────────────────────────────────────┘ │
 └──────────────────────┬──────────────────────────────────────────┘
                        │ SQLAlchemy ORM
-┌──────────────────────┴──────────────────────────────────────────┐
-│                     Database Layer                              │
+┌──────────────────────┴────────────────────────────────────────┐
+│                     Database Layer                            │
 │  ┌──────────┐  ┌───────────┐  ┌──────────┐  ┌─────────────┐   │
 │  │  Users   │  │ Portfolio │  │  Assets  │  │Transactions │   │
 │  ├──────────┤  ├───────────┤  ├──────────┤  ├─────────────┤   │
@@ -224,18 +224,18 @@ The Martingale platform follows a modular architecture with clear separation of 
 │  │ username │  │ cash      │  │ symbol   │  │ asset_id(FK)│   │
 │  │ pass_hash│  │ holdings* │  │ price    │  │ quantity    │   │
 │  │ created  │  │ updated   │  │ expires  │  │ price       │   │
-│  └──────────┘  └───────────┘  │ volatility│  │ type        │   │
-│                                │ drift    │  │ timestamp   │   │
-│                                │ is_active│  │ symbol**    │   │
+│  └──────────┘  └───────────┘  │ volatility│ │ type        │   │
+│                               │ drift    │  │ timestamp   │   │
+│                               │ is_active│  │ symbol**    │   │
 │  ┌──────────┐  ┌───────────┐  └──────────┘  └─────────────┘   │
-│  │PriceData │  │Settlement │                                   │
+│  │PriceData │  │Settlement │                                  │
 │  ├──────────┤  ├───────────┤  SQLite (dev) / PostgreSQL (prod)│
 │  │ symbol   │  │ user_id   │  *holdings: {asset_id: quantity} │
 │  │ current  │  │ asset_id  │  **symbol: legacy compatibility  │
-│  │ history  │  │ quantity  │                                   │
-│  │ updated  │  │ price     │                                   │
-│  └──────────┘  └───────────┘                                   │
-└─────────────────────────────────────────────────────────────────┘
+│  │ history  │  │ quantity  │                                  │
+│  │ updated  │  │ price     │                                  │
+│  └──────────┘  └───────────┘                                  │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 ### Background Processes
