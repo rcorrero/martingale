@@ -83,7 +83,8 @@ Random   Enabled   Price    Return   (30 days)
 **HybridPriceService** (`price_client.py`)
 - Dual-mode operation: API client or local fallback
 - Automatic failover if price service unavailable
-- Synchronizes with database for asset metadata
+- **Database Sync at Startup**: Queries active assets and syncs drift/volatility parameters
+- **Continuous Sync**: Updates asset parameters during each price update cycle
 
 **PriceServiceClient**
 - HTTP client for standalone price service (optional)
@@ -91,8 +92,10 @@ Random   Enabled   Price    Return   (30 days)
 
 **FallbackPriceService**
 - Local Geometric Brownian Motion price generation
-- Uses drift and volatility parameters from database
-- Formula: `dS = μS dt + σS dW`
+- **Database-driven Parameters**: Each asset uses unique drift (μ) and volatility (σ) from Asset table
+- **Startup Initialization**: Replaces hardcoded config with database values at app startup
+- **Dynamic Updates**: Syncs price, drift, and volatility for existing assets
+- Formula: `dS = μS dt + σS dW` where μ and σ are per-asset from database
 
 **Standalone Price Service** (`price_service.py`) - Optional
 - Independent Flask service on port 5001

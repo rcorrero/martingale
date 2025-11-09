@@ -348,17 +348,19 @@ class HybridPriceService:
         current_symbols = set(self.fallback.get_symbols())
         db_symbols = {asset.symbol for asset in active_assets}
         
-        # Add new assets or update existing ones with drift
+        # Add new assets or update existing ones with drift and volatility
         for asset in active_assets:
             if asset.symbol not in current_symbols:
                 self.fallback.add_asset(
                     symbol=asset.symbol,
-                    initial_price=asset.initial_price,
+                    initial_price=asset.current_price,  # Use current price from DB
                     volatility=asset.volatility,
                     drift=getattr(asset, 'drift', 0.0)  # Safe access for backward compatibility
                 )
             else:
-                # Update drift for existing assets (in case it changed)
+                # Update price, drift, and volatility for existing assets (in case they changed)
+                self.fallback.assets[asset.symbol]['price'] = asset.current_price
+                self.fallback.assets[asset.symbol]['volatility'] = asset.volatility
                 self.fallback.assets[asset.symbol]['drift'] = getattr(asset, 'drift', 0.0)
         
         # Remove assets no longer in database

@@ -265,7 +265,9 @@ The application runs two daemon threads for continuous operation:
 - **HybridPriceService**: Dual-mode price generation
   - API mode: Uses dedicated price service (optional)
   - Fallback mode: Local Geometric Brownian Motion generation
-- **GBM Algorithm**: `dS = μS dt + σS dW` with drift and volatility
+  - **Database Sync**: Automatically syncs drift and volatility from database at startup
+  - **Asset Parameters**: Each asset has unique drift (μ) and volatility (σ) from database
+- **GBM Algorithm**: `dS = μS dt + σS dW` with per-asset drift and volatility
 - **Price History**: Stored in database with configurable retention
 
 ## Project Structure

@@ -296,10 +296,28 @@ def add_global_transaction(transaction_data):
         db.session.commit()
 
 # Initialize price service (hybrid mode - uses API if available, fallback otherwise)
+# Start with empty config - will be populated from database
 price_service = HybridPriceService(
-    assets_config=app.config['ASSETS'],
+    assets_config={},  # Empty - populated from database at startup
     api_url=app.config.get('PRICE_SERVICE_URL')
 )
+
+# Sync price service with database at startup
+with app.app_context():
+    try:
+        # Query active assets from database with correct drift and volatility
+        now = current_utc()
+        active_assets = Asset.query.filter_by(is_active=True).filter(Asset.expires_at > now).all()
+        
+        if active_assets:
+            # Sync the fallback price service with database values
+            price_service.sync_assets_from_db(active_assets)
+            logger.info(f"Initialized price service with {len(active_assets)} active assets from database")
+        else:
+            logger.info("No active assets found in database at startup")
+    except Exception as e:
+        logger.warning(f"Could not sync price service with database at startup: {e}")
+        logger.info("Price service will fall back to config defaults if needed")
 
 # Initialize asset manager
 asset_manager = AssetManager(app.config, price_service, socketio)
