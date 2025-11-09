@@ -52,6 +52,7 @@ COMMUNICATION RULES:
 - Keep explanations concise and focused.
 
 DEVELOPMENT RULES:
+- **Always read README.md before making modifications** - Understand the current project structure, architecture, and conventions before making any code changes.
 - Use '.' as the working directory unless user specifies otherwise.
 - Avoid adding media or external links unless explicitly requested.
 - Use placeholders only with a note that they should be replaced.
