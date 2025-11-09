@@ -367,6 +367,7 @@ class Asset(db.Model):
             'initial_price': self.initial_price,
             'volatility': self.volatility,
             'drift': self.drift,
+            'color': self.color,
             'created_at': self.created_at.isoformat(),
             'expires_at': self.expires_at.isoformat(),
             'time_to_expiry_seconds': ttl.total_seconds() if ttl else 0,

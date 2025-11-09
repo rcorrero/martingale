@@ -406,12 +406,144 @@ Server → Client:
 
 ### Running Tests
 
-#### Unit Tests
-```bash
-# Input validation tests (57 tests)
-python -m unittest test_validators -v
+The Martingale project includes a comprehensive test suite with over 200+ tests covering models, business logic, API endpoints, and integration scenarios. Tests use pytest for test discovery and execution.
 
-# Asset lifecycle tests
+#### Prerequisites
+
+Install test dependencies:
+```bash
+pip install pytest pytest-cov pytest-flask
+```
+
+#### Quick Test Commands
+
+```bash
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test file
+pytest test_models.py -v
+
+# Run specific test class
+pytest test_models.py::TestUserModel -v
+
+# Run specific test
+pytest test_models.py::TestUserModel::test_create_user -v
+
+# Run tests matching pattern
+pytest -k "validation" -v
+
+# Run with coverage report
+pytest --cov=. --cov-report=html
+
+# Run tests and stop on first failure
+pytest -x
+```
+
+#### Test Suite Organization
+
+##### 1. Model Tests (`test_models.py`)
+Tests database models, relationships, and constraints:
+- **User Model**: Authentication, password hashing, cascade deletes
+- **Portfolio Model**: Holdings management, serialization, cash constraints
+- **Transaction Model**: CRUD operations, constraints, relationships
+- **Asset Model**: Lifecycle methods, expiration, symbol generation
+- **Settlement Model**: Settlement records, cascade behavior
+- **Database Constraints**: Integrity checks, foreign keys
+
+```bash
+# Run all model tests
+pytest test_models.py -v
+
+# Run specific model tests
+pytest test_models.py::TestUserModel -v
+pytest test_models.py::TestPortfolioModel -v
+pytest test_models.py::TestAssetModel -v
+```
+
+##### 2. Asset Manager Tests (`test_asset_manager.py`)
+Tests asset lifecycle management:
+- **Initialization**: Configuration, service dependencies
+- **Asset Queries**: Active/expired/worthless asset retrieval
+- **Expiration Processing**: Time-based and price-based expiration
+- **Settlement**: Position settlement, cash return, transaction creation
+- **Pool Maintenance**: Automatic asset replacement
+- **Cleanup**: Old asset removal
+
+```bash
+# Run all asset manager tests
+pytest test_asset_manager.py -v
+
+# Run specific test groups
+pytest test_asset_manager.py::TestAssetExpiration -v
+pytest test_asset_manager.py::TestPositionSettlement -v
+```
+
+##### 3. Application Tests (`test_app.py`)
+Tests Flask application endpoints and business logic:
+- **Authentication**: Registration, login, logout, rate limiting
+- **Portfolio Endpoints**: Portfolio data, holdings, performance
+- **Transaction Endpoints**: History, pagination, global feed
+- **Asset Endpoints**: Market data, price history, open interest
+- **Performance Calculations**: P&L, portfolio value, returns
+- **Input Validation**: SQL injection, XSS, parameter validation
+- **Error Handling**: Invalid inputs, unauthorized access
+
+```bash
+# Run all application tests
+pytest test_app.py -v
+
+# Run authentication tests
+pytest test_app.py::TestAuthentication -v
+
+# Run API endpoint tests
+pytest test_app.py::TestPortfolioEndpoints -v
+pytest test_app.py::TestAssetEndpoints -v
+```
+
+##### 4. Validator Tests (`test_validators.py`)
+Tests comprehensive input validation (57 tests):
+- **Trade Validation**: Quantity, price, trade value, type validation
+- **Symbol Validation**: Pattern matching, SQL injection protection
+- **Portfolio Validation**: Cash balance, sufficient funds/holdings
+- **Query Validation**: Pagination parameters, user IDs
+- **Edge Cases**: Infinity, NaN, negative values, precision
+- **Helper Functions**: Decimal conversion, safe parsing
+
+```bash
+# Run all validation tests
+pytest test_validators.py -v
+
+# Run specific validator tests
+pytest test_validators.py::TestTradeValidator -v
+pytest test_validators.py::TestSymbolValidator -v
+```
+
+##### 5. Integration Tests (`test_integration.py`)
+Tests end-to-end workflows:
+- **User Workflows**: Registration → trading → settlement
+- **Asset Lifecycle**: Creation → expiration → replacement
+- **Multi-User Scenarios**: Concurrent trading, competing traders
+- **Performance Calculations**: With real trading data
+- **Data Integrity**: Cash balance validity, no negative holdings
+- **Concurrent Operations**: Simultaneous settlements, transactions
+
+```bash
+# Run all integration tests
+pytest test_integration.py -v
+
+# Run specific workflow tests
+pytest test_integration.py::TestCompleteUserWorkflow -v
+pytest test_integration.py::TestAssetLifecycleWorkflow -v
+```
+
+##### 6. Legacy Tests
+Additional test files for specific features:
+```bash
+# Asset expiration tests
 python test_expiring_assets.py
 
 # Martingale property verification
@@ -419,12 +551,123 @@ python test_martingale_property.py
 
 # Drift implementation tests
 python test_drift_implementation.py
+
+# Service health checks
+python services_startup_test.py
 ```
 
-#### Integration Tests
+#### Test Coverage
+
+Generate coverage reports:
 ```bash
-# Service startup health check
-python services_startup_test.py
+# HTML coverage report (opens in browser)
+pytest --cov=. --cov-report=html
+open htmlcov/index.html
+
+# Terminal coverage report
+pytest --cov=. --cov-report=term-missing
+
+# Coverage for specific modules
+pytest --cov=models --cov=validators --cov=asset_manager --cov-report=html
+```
+
+Target coverage goals:
+- **Models**: >90% coverage
+- **Validators**: >95% coverage (critical for security)
+- **Asset Manager**: >85% coverage
+- **Application Routes**: >80% coverage
+
+#### Test Configuration
+
+Tests use `conftest.py` for shared fixtures:
+- **Test Database**: In-memory SQLite for isolation
+- **Test Client**: Flask test client with authentication
+- **Mock Services**: Price service and SocketIO mocks
+- **Data Generators**: Helper functions for creating test data
+- **Fixtures**: Users, portfolios, assets, transactions, settlements
+
+Common fixtures:
+```python
+# Basic fixtures
+test_user                  # User without portfolio
+test_user_with_portfolio   # User with empty portfolio
+multiple_users             # 3 users with portfolios
+
+# Asset fixtures
+test_asset                 # Single active asset
+multiple_assets            # 5 active assets
+expired_asset              # Already expired asset
+worthless_asset            # Price below threshold
+
+# Portfolio fixtures
+user_with_holdings         # User with 100 shares
+buy_transaction            # Sample buy transaction
+sell_transaction           # Sample sell transaction
+settlement_record          # Sample settlement
+
+# Service fixtures
+mock_price_service         # Mock price service
+mock_socketio              # Mock SocketIO
+authenticated_client       # Pre-authenticated test client
+```
+
+#### Running Tests in CI/CD
+
+Example GitHub Actions workflow:
+```yaml
+name: Tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+      - name: Run tests
+        run: pytest --cov=. --cov-report=xml
+      - name: Upload coverage
+        uses: codecov/codecov-action@v2
+```
+
+#### Test Best Practices
+
+When writing new tests:
+1. **Isolation**: Each test should be independent
+2. **Clear Names**: Use descriptive test names (test_what_when_then)
+3. **Fixtures**: Use fixtures for setup/teardown
+4. **Assertions**: Be specific about expected values
+5. **Edge Cases**: Test boundary conditions and error paths
+6. **Documentation**: Add docstrings explaining test purpose
+7. **Cleanup**: Tests should clean up after themselves
+8. **Speed**: Keep tests fast (use in-memory database)
+
+#### Debugging Tests
+
+```bash
+# Run with print statements visible
+pytest -s
+
+# Run with debugger on failure
+pytest --pdb
+
+# Show local variables on failure
+pytest -l
+
+# Verbose traceback
+pytest --tb=long
+
+# Only show failed tests
+pytest --failed-first
+
+# Re-run only failed tests from last run
+pytest --lf
 ```
 
 ### Database Management

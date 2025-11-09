@@ -7,27 +7,18 @@ Verifies:
 3. Backward compatibility with existing assets
 4. Drift distribution matches specification
 """
+import pytest
 import numpy as np
-import sys
-import os
-
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-os.environ.setdefault('FLASK_ENV', 'development')
-
-from app import create_app
 from models import db, Asset, current_utc
 from price_client import FallbackPriceService
 
 
-def test_drift_storage():
+def test_drift_storage(app):
     """Test that drift is properly stored in the database."""
     print("="*80)
     print("TEST 1: Drift Storage in Database")
     print("="*80)
     
-    app = create_app()
     with app.app_context():
         # Create an asset with specific drift
         test_drift = 0.015
@@ -69,7 +60,7 @@ def test_drift_storage():
         return passes
 
 
-def test_drift_distribution():
+def test_drift_distribution(app):
     """Test that randomly generated drifts follow the specified distribution."""
     print("\n" + "="*80)
     print("TEST 2: Drift Distribution Analysis")
@@ -78,7 +69,6 @@ def test_drift_distribution():
     print("Expected: Mean ≈ 0, Std Dev ≈ 0.01")
     print("="*80)
     
-    app = create_app()
     num_assets = 1000
     drifts = []
     
@@ -352,13 +342,12 @@ def test_backward_compatibility():
     return passes
 
 
-def test_asset_creation_with_drift():
-    """Test that create_new_asset properly handles drift parameter."""
+def test_asset_creation_with_drift(app):
+    """Test asset creation with explicit drift parameter."""
     print("\n" + "="*80)
     print("TEST 5: Asset Creation with Drift Parameter")
     print("="*80)
     
-    app = create_app()
     with app.app_context():
         # Test 1: Create asset with explicit drift
         explicit_drift = 0.025

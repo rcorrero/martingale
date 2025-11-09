@@ -115,7 +115,11 @@ def ensure_transaction_asset_schema():
             db.session.rollback()
 
 
-ensure_transaction_asset_schema()
+# Schema synchronization helpers are defined above. They must be run
+# after the database has been created. We avoid running them at import
+# time because tests create an in-memory database per-test and will
+# call `db.create_all()` inside fixtures. Running schema sync here
+# would access tables before they're created and cause OperationalError.
 
 
 def ensure_settlement_asset_schema():
@@ -162,7 +166,7 @@ def ensure_settlement_asset_schema():
             db.session.rollback()
 
 
-ensure_settlement_asset_schema()
+# See note above about running schema synchronization after DB init.
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -1556,12 +1560,12 @@ def expiration_check_thread():
             import traceback
             logger.error(traceback.format_exc())
 
-# Start background threads
-price_thread = threading.Thread(target=price_update_thread, daemon=True)
-price_thread.start()
-
-expiration_thread = threading.Thread(target=expiration_check_thread, daemon=True)
-expiration_thread.start()
+# NOTE: background threads should only be started when running the app
+# directly. Tests import this module and configure the app (e.g. set
+# TESTING=True) before creating database tables; starting background
+# threads at import time causes them to access the database before
+# fixtures have a chance to create tables. Threads are therefore
+# started inside the __main__ block below.
 
 if __name__ == '__main__':
     # Initialize database tables
@@ -1569,6 +1573,16 @@ if __name__ == '__main__':
         try:
             db.create_all()
             logger.info("Database tables created")
+            # Run schema synchronization helpers now that tables exist
+            try:
+                ensure_transaction_asset_schema()
+            except Exception:
+                logger.debug("ensure_transaction_asset_schema skipped or failed during init")
+
+            try:
+                ensure_settlement_asset_schema()
+            except Exception:
+                logger.debug("ensure_settlement_asset_schema skipped or failed during init")
             
             # Initialize asset pool if empty
             active_assets = Asset.query.filter_by(is_active=True).count()
@@ -1590,5 +1604,12 @@ if __name__ == '__main__':
     
     logger.info(f"Starting application on port {port}, debug={debug}")
     
+    # Start background threads only when running the app directly
+    price_thread = threading.Thread(target=price_update_thread, daemon=True)
+    price_thread.start()
+
+    expiration_thread = threading.Thread(target=expiration_check_thread, daemon=True)
+    expiration_thread.start()
+
     # Run with appropriate settings for production vs development
     socketio.run(app, debug=debug, port=port, host='0.0.0.0')

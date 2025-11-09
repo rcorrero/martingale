@@ -2,19 +2,13 @@
 Test script for expiring assets system.
 Run this to verify the asset lifecycle works correctly.
 """
-import sys
-import os
+import pytest
 from datetime import timedelta
-
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from app import app, db
-from models import Asset, User, Portfolio, Settlement, Transaction, current_utc
+from models import db, Asset, User, Portfolio, Settlement, Transaction, current_utc
 from asset_manager import AssetManager
-from config import config
 
-def test_asset_creation():
+
+def test_asset_creation(app):
     """Test creating new assets."""
     print("\n=== Testing Asset Creation ===")
     
@@ -37,7 +31,7 @@ def test_asset_creation():
         
         return asset1, asset2, asset3
 
-def test_asset_expiration():
+def test_asset_expiration(app):
     """Test expiring an asset immediately."""
     print("\n=== Testing Asset Expiration ===")
     
@@ -48,6 +42,8 @@ def test_asset_expiration():
             initial_price=100.0,
             current_price=105.0,
             volatility=0.05,
+            drift=0.0,
+            color=Asset.get_random_color(),
             expires_at=current_utc() + timedelta(seconds=1),
             is_active=True
         )
@@ -70,8 +66,8 @@ def test_asset_expiration():
         
         return asset
 
-def test_settlement():
-    """Test settling a user position in an expired asset."""
+def test_settlement(app):
+    """Test settling expired positions."""
     print("\n=== Testing Settlement ===")
     
     with app.app_context():
@@ -96,6 +92,8 @@ def test_settlement():
             initial_price=100.0,
             current_price=110.0,
             volatility=0.05,
+            drift=0.0,
+            color=Asset.get_random_color(),
             expires_at=current_utc() - timedelta(seconds=1),
             is_active=True
         )
@@ -147,9 +145,9 @@ def test_settlement():
         print(f"  - New cash balance: ${portfolio.cash:.2f}")
         print(f"  - Cash increase: ${portfolio.cash - initial_cash:.2f}")
 
-def test_asset_manager():
-    """Test the AssetManager class."""
-    print("\n=== Testing AssetManager ===")
+def test_asset_manager(app):
+    """Test AssetManager behavior."""
+    print("\n=== Testing Asset Manager ===")
     
     with app.app_context():
         manager = AssetManager(app.config)
@@ -183,8 +181,8 @@ def test_asset_manager():
         print(f"  - Active assets: {maintenance['active_assets']}")
         print(f"  - Created assets: {maintenance['created_assets']}")
 
-def test_full_lifecycle():
-    """Test complete asset lifecycle: create -> trade -> expire -> settle -> replace."""
+def test_full_lifecycle(app):
+    """Test complete asset lifecycle."""
     print("\n=== Testing Full Lifecycle ===")
     
     with app.app_context():
@@ -196,6 +194,8 @@ def test_full_lifecycle():
             initial_price=100.0,
             current_price=100.0,
             volatility=0.05,
+            drift=0.0,
+            color=Asset.get_random_color(),
             expires_at=current_utc() + timedelta(seconds=2),
             is_active=True
         )
