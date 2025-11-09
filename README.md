@@ -1,40 +1,60 @@
-# Martingale
+# Martingale Trading Platform
 
-A paper trading web application that simulates real-time asset trading with virtual money. Built with Flask, SocketIO, and Chart.js for an interactive trading experience.
+A sophisticated paper trading web application that simulates real-time asset trading with virtual money. Built with Flask, SocketIO, SQLAlchemy, and Chart.js for an interactive, production-ready trading experience.
 
-## Features
+## Overview
 
-- **Real-time Trading**: Buy and sell simulated assets with live price updates
-- **Expiring Assets**: Assets have predefined expiration dates (1 day to 1 month)
-- **Automatic Settlement**: Positions automatically settled at expiration with cash returned
-- **Dynamic Asset Pool**: New assets automatically created to replace expired ones
-- **Interactive Charts**: Real-time price history charts with VWAP indicators
-- **Portfolio Management**: Track holdings, cash balance, and trading history
-- **Performance Analytics**: Comprehensive P&L tracking with realized/unrealized gains
-- **User Authentication**: Secure login system with persistent user portfolios
-- **Responsive Design**: Works seamlessly on desktop and mobile devices
+Martingale is a full-featured paper trading platform that simulates futures-style contracts with expiring assets. The system automatically manages asset lifecycles, settles positions at expiration, and maintains a dynamic pool of tradeable instruments. Designed with production-level security, input validation, and real-time price streaming.
 
-## What's New: Expiring Assets System
+## Core Features
 
-The platform now supports **dynamic expiring assets** that simulate real-world futures contracts:
+### Trading & Markets
+- **Real-time Price Updates**: WebSocket-based streaming price data with 1-second updates
+- **Dynamic Asset Pool**: System maintains minimum of 16 active tradeable assets
+- **Expiring Assets**: Each asset has a random expiration date (1-30 days)
+- **Geometric Brownian Motion**: Price evolution with configurable drift and volatility
+- **VWAP Tracking**: Volume-weighted average price calculation per user position
 
-- ✅ **Random Asset Generation**: New assets created with 3-letter symbols (e.g., "KLP", "FGH")
-- ✅ **Variable Expirations**: Each asset expires between 1 day and 1 month from creation
-- ✅ **Automatic Settlement**: Holdings settled at final price upon expiration
-- ✅ **Auto-Replacement**: System maintains minimum of 10 active assets
-- ✅ **Settlement History**: Complete audit trail of all settlements
-- ✅ **No Manual Intervention**: Fully automated lifecycle management
+### Portfolio Management
+- **Multi-user Support**: Concurrent trading with isolated user portfolios
+- **Position Tracking**: Quantity, VWAP, unrealized P&L per asset
+- **Settlement History**: Complete audit trail of expired positions
+- **Performance Analytics**: Realized/unrealized P&L, total return, portfolio value history
+- **Transaction History**: Complete trade log with timestamps and settlement records
 
-See [EXPIRING_ASSETS_SUMMARY.md](EXPIRING_ASSETS_SUMMARY.md) for detailed documentation.
+### Asset Lifecycle Management
+- **Automatic Expiration**: Background thread monitors and expires assets
+- **Position Settlement**: Holdings automatically converted to cash at final price
+- **Auto-Replacement**: New assets created to maintain minimum pool size
+- **Worthless Asset Detection**: Early settlement for assets below price threshold
+- **Cleanup System**: Removes old expired assets after configurable retention period
 
-## Installation
+### Security & Validation
+- **Input Validation**: Comprehensive validation system with Decimal precision for financial calculations
+- **Rate Limiting**: Login attempt throttling (5 attempts per 5 minutes)
+- **Password Security**: Scrypt hashing with 8+ character minimum
+- **Session Management**: HttpOnly cookies, CSRF protection, 1-hour timeout
+- **SQL Injection Protection**: Parameterized queries via SQLAlchemy ORM
+- **Database Constraints**: CHECK constraints for data integrity at the database level
+
+### User Experience
+- **Responsive Design**: Mobile-optimized interface with touch-friendly controls
+- **Real-time Updates**: WebSocket notifications for price changes and settlements
+- **Interactive Charts**: Chart.js visualizations with historical price data
+- **Portfolio Pie Chart**: Visual breakdown of holdings by asset
+- **Global Leaderboard**: Compare performance with other traders
+- **Color-coded Assets**: Each asset assigned unique color for visual identification
+
+## Installation & Setup
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.11 or higher (tested on 3.11.x)
 - pip (Python package installer)
+- Virtual environment (recommended)
+- PostgreSQL (for production) or SQLite (for development)
 
-### Setup
+### Quick Start (Development)
 
 1. **Clone the repository:**
    ```bash
@@ -42,51 +62,95 @@ See [EXPIRING_ASSETS_SUMMARY.md](EXPIRING_ASSETS_SUMMARY.md) for detailed docume
    cd martingale
    ```
 
-2. **Create a virtual environment:**
+2. **Create and activate virtual environment:**
    ```bash
-   5. **Initialize the database schema:**
-       ```bash
-       python init_database.py --env development
-       ```
-
-   6. **Run the application:**
+   python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 3. **Install dependencies:**
-   7. **Open your browser and navigate to:**
+   ```bash
    pip install -r requirements.txt
    ```
 
 4. **Configure environment variables:**
    ```bash
    cp .env.example .env
-   # Edit .env file with your preferred settings
+   # Edit .env with your settings (SECRET_KEY, etc.)
    ```
 
-5. **Run the application:**
+5. **Initialize the database:**
+   ```bash
+   python init_database.py --env development
+   ```
+   This will:
+   - Create all database tables (users, portfolios, assets, transactions, settlements)
+   - Seed price metadata from config
+   - Create initial pool of 16 active expiring assets
+
+6. **Run the application:**
    ```bash
    python app.py
    ```
 
-6. **Open your browser and navigate to:**
+7. **Access the application:**
    ```
-   http://localhost:5001
+   http://localhost:5000
    ```
+
+### Alternative: Start All Services
+
+If you want to run the optional standalone price service alongside the main app:
+
+```bash
+python start_services.py
+```
+
+This starts:
+- Price service on port 5001 (optional, app has fallback)
+- Main application on port 5000
+
+**Note**: The app works fine without the price service - it uses local fallback price generation.
 
 ## Configuration
 
-The application uses environment variables for configuration. Copy `.env.example` to `.env` and modify as needed:
+### Environment Variables
 
-- `SECRET_KEY`: Flask secret key for session security
-- `FLASK_ENV`: Set to 'development' or 'production'
-- `FLASK_DEBUG`: Enable/disable debug mode
-- `FLASK_PORT`: Port number for the application
-- `INITIAL_CASH`: Starting cash amount for new users (default: 100000)
-- `INITIAL_ASSET_PRICE`: Starting price for new assets (default: 100)
-- `MIN_ACTIVE_ASSETS`: Minimum active assets to maintain (default: 10)
-- `EXPIRATION_CHECK_INTERVAL`: How often to check for expirations in seconds (default: 60)
-- `CLEANUP_OLD_ASSETS_DAYS`: Remove expired assets after N days (default: 30)
+Copy `.env.example` to `.env` and customize:
+
+```bash
+# Security (REQUIRED in production)
+SECRET_KEY=your-super-secret-key-change-in-production
+
+# Flask Environment
+FLASK_ENV=development              # 'development' or 'production'
+FLASK_DEBUG=True                   # Debug mode (disable in production)
+
+# Database
+DATABASE_URL=sqlite:///instance/martingale.db  # SQLite for dev
+# DATABASE_URL=postgresql://user:pass@host:5432/dbname  # PostgreSQL for prod
+
+# Trading Configuration
+INITIAL_CASH=100000               # Starting cash for new users
+INITIAL_ASSET_PRICE=100           # Base price for new assets
+
+# Asset Lifecycle
+MIN_ACTIVE_ASSETS=16              # Minimum active assets in pool
+EXPIRATION_CHECK_INTERVAL=60      # Seconds between expiration checks
+CLEANUP_OLD_ASSETS_DAYS=30        # Remove expired assets after N days
+
+# Price Service (optional)
+PRICE_SERVICE_URL=http://localhost:5001  # Standalone price service URL
+```
+
+### Configuration Classes
+
+The application uses environment-based configuration (see `config.py`):
+
+- **DevelopmentConfig**: Debug enabled, SQLite database, verbose logging
+- **ProductionConfig**: Debug disabled, PostgreSQL, secure cookies, HTTPS enforcement
+
+Configuration automatically selected based on `FLASK_ENV` environment variable.
 
 ## Usage
 
@@ -96,77 +160,353 @@ The application uses environment variables for configuration. Copy `.env.example
 4. **Monitor Portfolio**: Track your holdings and performance in real-time
 5. **Analyze Performance**: View detailed P&L analytics and transaction history
 
+## Architecture
+
+### System Components
+
+The Martingale platform follows a modular architecture with clear separation of concerns:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Client Browser                           │
+│  ┌─────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │   HTML/CSS  │  │ JavaScript   │  │   Chart.js           │  │
+│  │  Templates  │  │   (main.js)  │  │   Visualizations     │  │
+│  └─────────────┘  └──────────────┘  └──────────────────────┘  │
+└──────────────────────┬──────────────────────────────────────────┘
+                       │ HTTP/WebSocket
+┌──────────────────────┴──────────────────────────────────────────┐
+│                      Flask Application                          │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │                       app.py                                │ │
+│  │  • WebSocket event handlers (SocketIO)                     │ │
+│  │  • REST API endpoints                                      │ │
+│  │  • Authentication & session management (Flask-Login)       │ │
+│  │  • Background threads (price updates, expiration checks)   │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│  ┌────────────────────┐    ┌─────────────────────────────────┐ │
+│  │  AssetManager      │    │     PriceClient                 │ │
+│  │  • Lifecycle mgmt  │    │     • Hybrid price service      │ │
+│  │  • Expiration      │◄───┤     • API client + fallback     │ │
+│  │  • Settlement      │    │     • GBM price generation      │ │
+│  │  • Pool maint.     │    └─────────────────────────────────┘ │
+│  └────────────────────┘                                         │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │                    Validators                              │ │
+│  │  • TradeValidator    • SymbolValidator                     │ │
+│  │  • PortfolioValidator • QueryValidator                     │ │
+│  │  • Decimal precision  • SQL injection protection          │ │
+│  └────────────────────────────────────────────────────────────┘ │
+└──────────────────────┬──────────────────────────────────────────┘
+                       │ SQLAlchemy ORM
+┌──────────────────────┴──────────────────────────────────────────┐
+│                     Database Layer                              │
+│  ┌──────────┐  ┌───────────┐  ┌──────────┐  ┌─────────────┐   │
+│  │  Users   │  │ Portfolio │  │  Assets  │  │Transactions │   │
+│  ├──────────┤  ├───────────┤  ├──────────┤  ├─────────────┤   │
+│  │ id       │  │ user_id   │  │ symbol   │  │ user_id     │   │
+│  │ username │  │ cash      │  │ price    │  │ asset_id    │   │
+│  │ pass_hash│  │ holdings  │  │ expires  │  │ quantity    │   │
+│  │ created  │  │ updated   │  │ volatility│  │ price       │   │
+│  └──────────┘  └───────────┘  │ drift    │  │ type        │   │
+│                                │ is_active│  │ timestamp   │   │
+│  ┌──────────┐  ┌───────────┐  └──────────┘  └─────────────┘   │
+│  │PriceData │  │Settlement │                                   │
+│  ├──────────┤  ├───────────┤  SQLite (dev) / PostgreSQL (prod)│
+│  │ symbol   │  │ user_id   │                                   │
+│  │ current  │  │ asset_id  │                                   │
+│  │ history  │  │ quantity  │                                   │
+│  │ updated  │  │ price     │                                   │
+│  └──────────┘  └───────────┘                                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Background Processes
+
+The application runs two daemon threads for continuous operation:
+
+1. **Price Update Thread**
+   - Frequency: Every 1 second
+   - Fetches prices from price service (or generates locally)
+   - Updates database with new price points
+   - Broadcasts updates to all connected clients via WebSocket
+   - Limits history to prevent unbounded growth
+
+2. **Expiration Check Thread**
+   - Frequency: Every 60 seconds (configurable)
+   - Queries database for expired assets
+   - Settles all user positions at final price
+   - Creates replacement assets to maintain minimum pool
+   - Cleans up old expired assets beyond retention period
+
 ## Technology Stack
 
-- **Backend**: Flask, Flask-SocketIO, Flask-Login, Flask-SQLAlchemy
-- **Frontend**: HTML5, CSS3, JavaScript (ES6+)
-- **Real-time**: WebSocket communications via SocketIO
-- **Charts**: Chart.js with real-time streaming
-- **Authentication**: Flask-Login with scrypt password hashing
-- **Database**: SQLite (development) / PostgreSQL (production)
-- **Asset Management**: Custom lifecycle manager with automatic settlement
+### Backend
+- **Flask 3.x**: Web framework with application factory pattern
+- **Flask-SocketIO**: WebSocket support for real-time communication
+- **Flask-Login**: User session management and authentication
+- **Flask-SQLAlchemy**: ORM for database interactions
+- **Flask-WTF**: Form handling and CSRF protection
+- **Werkzeug**: Password hashing (scrypt algorithm)
+- **SQLAlchemy**: Database toolkit with CHECK constraints
+
+### Frontend
+- **HTML5/CSS3**: Responsive terminal-themed UI
+- **JavaScript (ES6+)**: Client-side logic and WebSocket handling
+- **Chart.js 4.x**: Real-time price charts and portfolio visualization
+- **Socket.IO Client**: WebSocket client library
+
+### Database
+- **SQLite**: Development and testing
+- **PostgreSQL**: Production deployment (Heroku compatible)
+- **Migrations**: Automated schema updates with backward compatibility
+
+### Pricing System
+- **HybridPriceService**: Dual-mode price generation
+  - API mode: Uses dedicated price service (optional)
+  - Fallback mode: Local Geometric Brownian Motion generation
+- **GBM Algorithm**: `dS = μS dt + σS dW` with drift and volatility
+- **Price History**: Stored in database with configurable retention
 
 ## Project Structure
 
 ```
 martingale/
-├── app.py                      # Main application file
-├── config.py                   # Configuration settings
-├── models.py                   # Database models (User, Portfolio, Asset, Settlement)
-├── asset_manager.py            # Asset lifecycle management
-├── price_client.py             # Price service client with fallback
-├── price_service.py            # Standalone price generation service
-├── requirements.txt            # Python dependencies
-├── .env.example               # Environment variables template
-├── .gitignore                 # Git ignore rules
-├── README.md                  # Project documentation
-├── EXPIRING_ASSETS_SUMMARY.md # Expiring assets documentation
-├── MIGRATION_EXPIRING_ASSETS.md # Migration guide
-├── SECURITY.md                # Security documentation
-├── test_expiring_assets.py    # Test suite for asset lifecycle
-├── static/
-│   ├── css/
-│   │   └── style.css          # Application styles
-│   └── js/
-│       └── main.js            # Frontend JavaScript
-└── templates/
-    ├── index.html             # Main trading interface
-    ├── login.html             # Login page
-    └── register.html          # Registration page
+├── Core Application
+│   ├── app.py                      # Flask app, API routes, WebSocket handlers
+│   ├── config.py                   # Environment-based configuration
+│   ├── models.py                   # SQLAlchemy models (User, Portfolio, Asset, etc.)
+│   ├── asset_manager.py            # Asset lifecycle orchestration
+│   ├── price_client.py             # Hybrid price service (API + fallback)
+│   ├── price_service.py            # Standalone price generation service (optional)
+│   ├── validators.py               # Input validation with Decimal precision
+│   └── start_services.py           # Startup script for all services
+│
+├── Database Management
+│   ├── init_database.py            # Unified schema initialization CLI
+│   ├── init_db.py                  # Legacy entry point (delegates to init_database)
+│   ├── init_heroku_db.py           # Heroku-specific initialization
+│   ├── migrate_add_drift.py        # Migration: Add drift column
+│   ├── migrate_add_color.py        # Migration: Add color column
+│   └── migrate_password_hash.py    # Migration: Update password hashing
+│
+├── Testing & Validation
+│   ├── test_expiring_assets.py     # Asset lifecycle tests
+│   ├── test_drift_implementation.py # GBM drift tests
+│   ├── test_martingale_property.py # Martingale property verification
+│   ├── test_validators.py          # Input validation tests (57 tests)
+│   └── services_startup_test.py    # Service health checks
+│
+├── Deployment
+│   ├── Procfile                    # Heroku process definition
+│   ├── runtime.txt                 # Python version specification
+│   ├── requirements.txt            # Production dependencies
+│   ├── requirements-prod.txt       # Additional production packages
+│   ├── deploy.sh                   # Deployment automation script
+│   └── cleanup-data.sh             # Database cleanup utility
+│
+├── Documentation
+│   ├── README.md                   # This file
+│   ├── README_ARCHITECTURE.md      # Detailed architecture documentation
+│   ├── SECURITY.md                 # Security features and best practices
+│   ├── EXPIRING_ASSETS_SUMMARY.md  # Asset lifecycle system documentation
+│   ├── MIGRATION_EXPIRING_ASSETS.md # Migration guide for expiring assets
+│   ├── DRIFT_IMPLEMENTATION.md     # GBM drift implementation details
+│   ├── VALIDATION_ARCHITECTURE.md  # Input validation system documentation
+│   ├── DEPLOYMENT.md               # Deployment checklist
+│   ├── DEPLOYMENT_READY.md         # Production readiness status
+│   ├── PRODUCTION_CHECKLIST.md     # Pre-launch verification
+│   ├── PRODUCTION-STATUS.md        # Current production status
+│   ├── QUICK_DEPLOY.md             # Quick deployment guide
+│   ├── QUICK_REFERENCE.md          # API quick reference
+│   ├── MOBILE_VWAP_FEATURE.md      # Mobile VWAP implementation
+│   └── CONTRIBUTING.md             # Contribution guidelines
+│
+├── Frontend
+│   ├── templates/
+│   │   ├── index.html              # Main trading interface
+│   │   ├── login.html              # User login page
+│   │   ├── register.html           # User registration page
+│   │   └── about.html              # About/info page
+│   └── static/
+│       ├── css/
+│       │   └── style.css           # Terminal-themed styling
+│       ├── js/
+│       │   └── main.js             # WebSocket client, charts, UI logic
+│       └── [favicon files]         # Site icons
+│
+├── Data & Assets
+│   ├── instance/                   # SQLite database directory (dev)
+│   │   └── martingale.db           # Development database
+│   └── notebooks/                  # Jupyter analysis notebooks
+│       └── inspect_martingale.ipynb
+│
+└── Configuration
+    ├── .env                        # Environment variables (local, not in git)
+    ├── .env.example                # Environment variables template
+    ├── .gitignore                  # Git ignore patterns
+    ├── app.json                    # Heroku app configuration
+    └── LICENSE                     # MIT License
 ```
+
+## API Reference
+
+### Public Endpoints
+
+- `GET /` - Main trading interface (requires login)
+- `GET /login` - User login page
+- `POST /login` - Authenticate user
+- `GET /register` - User registration page
+- `POST /register` - Create new user account
+- `GET /logout` - Log out current user
+- `GET /about` - About page
+
+### Authenticated API Endpoints
+
+All require valid session cookie:
+
+#### Portfolio & Performance
+- `GET /api/portfolio` - User's current portfolio (holdings, cash, positions)
+- `GET /api/performance` - P&L metrics (realized/unrealized, total return)
+- `GET /api/performance/history` - Historical portfolio value snapshots
+- `GET /api/transactions` - User's transaction history
+- `GET /api/settlements` - User's settlement history (expired positions)
+
+#### Market Data
+- `GET /api/assets` - Active tradeable assets with prices and expiration
+- `GET /api/assets/history?symbol=XYZ` - Price history for specific asset
+- `GET /api/assets/summary` - Asset pool statistics (active/expired counts)
+- `GET /api/open-interest` - Open interest per asset across all users
+
+#### Global Data
+- `GET /api/transactions/all` - Global transaction feed (all users)
+- `GET /api/leaderboard` - Top traders by total P&L
+
+### WebSocket Events
+
+Client → Server:
+- `trade` - Execute buy/sell order
+  ```javascript
+  socket.emit('trade', {
+    symbol: 'XYZ',
+    quantity: 10.5,
+    action: 'buy'  // or 'sell'
+  });
+  ```
+
+Server → Client:
+- `price_update` - Real-time price updates (1s interval)
+- `portfolio_update` - Portfolio changed (trade executed, settlement)
+- `trade_result` - Trade execution result (success/error)
+- `assets_updated` - Asset pool changed (expiration, new assets)
+- `asset_expiring_soon` - Asset approaching expiration warning
+- `settlement_notification` - Position was settled
 
 ## Development
 
-### Testing the System
+### Running Tests
 
-Run the test suite to verify asset lifecycle:
-
+#### Unit Tests
 ```bash
+# Input validation tests (57 tests)
+python -m unittest test_validators -v
+
+# Asset lifecycle tests
 python test_expiring_assets.py
+
+# Martingale property verification
+python test_martingale_property.py
+
+# Drift implementation tests
+python test_drift_implementation.py
 ```
 
-Tests include:
-- Asset creation with random parameters
-- Expiration mechanics
-- Settlement processing
-- Pool maintenance
-- Full lifecycle integration
-
-### Monitoring Asset Lifecycle
-
-Check asset statistics:
+#### Integration Tests
 ```bash
-curl http://localhost:5000/api/assets/summary
+# Service startup health check
+python services_startup_test.py
 ```
 
-View active assets:
+### Database Management
+
+#### Initialize/Reset Database
 ```bash
-curl http://localhost:5000/api/assets | jq
+# Full reset (drops tables, reseeds data, creates asset pool)
+python init_database.py --env development
+
+# Non-destructive (only create missing tables/assets)
+python init_database.py --env development --no-reset
+
+# Skip asset pool creation
+python init_database.py --env development --skip-asset-seed
 ```
 
-Watch expiration logs:
+#### Run Migrations
 ```bash
-tail -f martingale.log | grep -i "expir"
+# Add drift column to existing assets
+python migrate_add_drift.py
+
+# Add color column to assets
+python migrate_add_color.py
+
+# Update password hashing algorithm
+python migrate_password_hash.py
+```
+
+#### Flask Shell Operations
+```bash
+flask shell
+
+>>> from models import db, User, Asset, Portfolio, Transaction
+>>> 
+>>> # Check active assets
+>>> Asset.query.filter_by(is_active=True).count()
+16
+>>> 
+>>> # View user portfolios
+>>> Portfolio.query.all()
+>>> 
+>>> # Force expire an asset (for testing)
+>>> from datetime import datetime, timedelta, timezone
+>>> asset = Asset.query.filter_by(symbol='XYZ').first()
+>>> asset.expires_at = datetime.now(timezone.utc).replace(tzinfo=None)
+>>> db.session.commit()
+```
+
+### Monitoring & Debugging
+
+#### Check Asset Statistics
+```bash
+curl http://localhost:5000/api/assets/summary | jq
+```
+
+Response:
+```json
+{
+  "active_count": 16,
+  "expired_unsettled_count": 0,
+  "expired_settled_count": 23,
+  "average_ttl_hours": 360.5,
+  "active_symbols": ["ABC", "DEF", ...],
+  "expiring_soon": [...]
+}
+```
+
+#### Watch Real-time Logs
+```bash
+# Follow application logs
+tail -f martingale.log
+
+# Filter for specific events
+tail -f martingale.log | grep -i "expir"      # Expirations
+tail -f martingale.log | grep -i "settlement" # Settlements
+tail -f martingale.log | grep -i "ERROR"      # Errors
+```
+
+#### Price Service Health Check
+```bash
+# If running standalone price service
+curl http://localhost:5001/health
 ```
 
 ### Customizing Asset Generation
@@ -180,68 +520,212 @@ days_to_expiry = random.randint(7, 14)  # 1-2 weeks only
 # Change volatility range (default 0.1%-20%)
 volatility = random.uniform(0.01, 0.10)  # 1%-10% only
 
+# Change drift distribution (default N(0, 0.01))
+drift = random.gauss(0.005, 0.01)  # Positive bias
+
+# Change initial price (default $100 ± 50%)
+initial_price = random.uniform(50, 150)
+
 # Change symbol length (default 3)
 symbol = Asset.generate_symbol(length=4)  # 4-letter symbols
 ```
 
-### Database Operations
-
-Access Flask shell for manual operations:
-```bash
-flask shell
->>> from models import Asset, Settlement
->>> Asset.query.filter_by(is_active=True).count()
-10
->>> Asset.query.filter_by(is_active=False).count()
-0
-```
-
-### Resetting the Database
-
-Use the unified initialization script to drop and recreate tables, reseed price metadata, and rebuild the active asset pool:
+### Code Style & Linting
 
 ```bash
-python init_database.py --env development
+# Format code (if using black)
+black app.py models.py validators.py
+
+# Lint code
+flake8 *.py
+
+# Security scanning
+bandit -r . -x ./venv
 ```
 
-Flags such as `--no-reset`, `--skip-price-seed`, or `--skip-asset-seed` let you customize what gets reinitialized. For production deployments (including Heroku) run the same script with `--env production` in the target environment.
+## Production Deployment
+
+### Heroku Deployment
+
+1. **Create Heroku app:**
+   ```bash
+   heroku create your-app-name
+   ```
+
+2. **Add PostgreSQL:**
+   ```bash
+   heroku addons:create heroku-postgresql:mini
+   ```
+
+3. **Set environment variables:**
+   ```bash
+   heroku config:set SECRET_KEY=$(openssl rand -hex 32)
+   heroku config:set FLASK_ENV=production
+   heroku config:set INITIAL_CASH=100000
+   ```
+
+4. **Deploy:**
+   ```bash
+   git push heroku main
+   ```
+
+5. **Initialize database:**
+   ```bash
+   # Database is automatically initialized via Procfile release phase
+   # Or manually trigger:
+   heroku run python init_heroku_db.py
+   ```
+
+6. **Open application:**
+   ```bash
+   heroku open
+   ```
+
+### Production Checklist
+
+Before deploying to production:
+
+- [ ] Set strong `SECRET_KEY` (use `openssl rand -hex 32`)
+- [ ] Set `FLASK_ENV=production`
+- [ ] Use PostgreSQL database (not SQLite)
+- [ ] Enable HTTPS/SSL
+- [ ] Configure session timeout appropriately
+- [ ] Set up monitoring (Sentry, DataDog, etc.)
+- [ ] Configure backup strategy for database
+- [ ] Review and test all security features
+- [ ] Run full test suite
+- [ ] Load test with expected user concurrency
+- [ ] Set up log aggregation (Papertrail, Loggly, etc.)
+- [ ] Configure DNS and custom domain
+- [ ] Set up CDN for static assets (optional)
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) and [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md) for detailed deployment guides.
+
+## Security
+
+⚠️ **Production-Ready Security**: This application implements comprehensive security features suitable for production deployment.
+
+### Implemented Security Features
+
+#### Input Validation (Phase 1.1) ✅
+- **Decimal Precision**: All financial calculations use Python's Decimal type (8 decimal places)
+- **Bounds Checking**: Quantity (1e-8 to 1B), Price ($0.01 to 1B), Trade Value (max 10B)
+- **Type Safety**: Rejects negative values, infinity, NaN, malformed inputs
+- **SQL Injection Protection**: Symbol validator blocks SQL keywords, injection patterns
+- **Database Constraints**: CHECK constraints enforce rules at database level
+
+#### Authentication & Session Security ✅
+- **Password Hashing**: Scrypt algorithm (CPU and memory hard)
+- **Password Policy**: 8+ characters, rejects whitespace-only passwords
+- **Rate Limiting**: 5 failed login attempts per 5 minutes per username
+- **Session Management**: HttpOnly cookies, SameSite=Lax, 1-hour timeout
+- **CSRF Protection**: Flask-WTF tokens on all forms
+
+#### Database Security ✅
+- **ORM-only Queries**: No raw SQL, all queries parameterized via SQLAlchemy
+- **Username Validation**: Alphanumeric + underscore only, blocks reserved names
+- **Data Integrity**: CHECK constraints on portfolios, transactions, assets
+
+#### API Security ✅
+- **Authentication Required**: All trading/portfolio endpoints require login
+- **Input Sanitization**: All user inputs validated before processing
+- **Error Handling**: Safe error messages, no information leakage
+
+### Security Documentation
+
+Comprehensive security documentation available:
+- **[SECURITY.md](SECURITY.md)** - Security features and incident response
+- **[VALIDATION_ARCHITECTURE.md](VALIDATION_ARCHITECTURE.md)** - Input validation system (57 tests)
+- **[test_validators.py](test_validators.py)** - Validation test suite
+
+### Reporting Security Issues
+
+Found a security vulnerability? Please report via private email (do not create public issues):
+- Email: [your-email@example.com]
+- Include: Description, reproduction steps, impact assessment, suggested fix
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Contributions are welcome! Please follow these guidelines:
 
-## Security Considerations
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature/your-feature-name`
+3. **Write tests**: Add tests for new functionality
+4. **Follow code style**: Use consistent formatting (black, flake8)
+5. **Update documentation**: Update README, docstrings, type hints
+6. **Run tests**: Ensure all tests pass before submitting
+7. **Commit with clear messages**: Use descriptive commit messages
+8. **Push to your fork**: `git push origin feature/your-feature-name`
+9. **Open Pull Request**: Describe changes, link related issues
 
-⚠️ **Important**: This application implements multiple security features for production use.
+### Development Guidelines
 
-### Implemented Security Features
-- ✅ **Input Validation** (Phase 1.1 - Production Ready)
-  - Comprehensive validation module with Decimal precision for financial calculations
-  - Symbol validation with SQL injection protection
-  - Quantity/price bounds checking (prevents negative, infinity, NaN values)
-  - Trade value limits to prevent overflow attacks
-  - Database CHECK constraints as defense-in-depth layer
-- ✅ Password length policy (8+ chars, whitespace-only passwords rejected)
-- ✅ Username validation and sanitization
-- ✅ Rate limiting on login attempts (5 attempts per 5 minutes)
-- ✅ Password hashing with scrypt algorithm
-- ✅ Session security (HttpOnly, SameSite, timeout)
-- ✅ CSRF protection on all forms
-- ✅ SQL injection prevention via SQLAlchemy ORM and validators
-- ✅ XSS protection with secure cookie configuration
+- Use type hints for function signatures
+- Write docstrings for all public functions/classes
+- Add validation for all user inputs
+- Include unit tests for new features
+- Keep functions focused and modular
+- Follow defensive programming practices
+- Update documentation when changing behavior
 
-### For Production Deployment
-1. **Set strong SECRET_KEY** in environment variables
-2. **Use HTTPS** (SESSION_COOKIE_SECURE enabled in production)
-3. **Use PostgreSQL** instead of SQLite for better concurrency
-4. **Review SECURITY.md** for comprehensive security documentation
-5. **Keep dependencies updated** for security patches
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
 
-See [SECURITY.md](SECURITY.md) for detailed security documentation and best practices.
+## Troubleshooting
+
+### Common Issues
+
+#### Database Errors
+```
+Solution: Reset database
+python init_database.py --env development
+```
+
+#### Port Already in Use
+```
+Error: Address already in use (port 5000)
+Solution: Kill existing process or change port
+lsof -ti:5000 | xargs kill -9
+# Or set in .env: FLASK_PORT=5001
+```
+
+#### WebSocket Connection Failed
+```
+Solution: Check CORS settings, ensure SocketIO installed
+pip install flask-socketio python-socketio
+```
+
+#### Assets Not Expiring
+```
+Solution: Check expiration thread is running
+tail -f martingale.log | grep "expiration"
+# Should see checks every 60 seconds
+```
+
+#### Price Updates Not Working
+```
+Solution: Check price service status
+curl http://localhost:5001/health
+# Or check fallback mode is active in logs
+```
+
+### Getting Help
+
+1. **Check logs**: `martingale.log` contains detailed error information
+2. **Review documentation**: See `docs/` directory for guides
+3. **Run diagnostics**: `python services_startup_test.py`
+4. **GitHub Issues**: [Create an issue](https://github.com/yourusername/martingale/issues)
+
+## Related Documentation
+
+- **[README_ARCHITECTURE.md](README_ARCHITECTURE.md)** - Detailed architecture overview (legacy, partially outdated)
+- **[EXPIRING_ASSETS_SUMMARY.md](EXPIRING_ASSETS_SUMMARY.md)** - Asset lifecycle system
+- **[VALIDATION_ARCHITECTURE.md](VALIDATION_ARCHITECTURE.md)** - Input validation deep dive
+- **[DRIFT_IMPLEMENTATION.md](DRIFT_IMPLEMENTATION.md)** - GBM drift parameter details
+- **[SECURITY.md](SECURITY.md)** - Security features and practices
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Deployment checklist
+- **[MIGRATION_EXPIRING_ASSETS.md](MIGRATION_EXPIRING_ASSETS.md)** - Migration guide (legacy → expiring assets)
+- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick API reference
+- **[MOBILE_VWAP_FEATURE.md](MOBILE_VWAP_FEATURE.md)** - Mobile UI VWAP implementation
 
 ## License
 
@@ -249,18 +733,29 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- Chart.js for excellent charting capabilities
-- Flask community for comprehensive documentation
-- Contributors and testers
+- **Flask** - Excellent web framework and ecosystem
+- **Chart.js** - Powerful charting library
+- **Socket.IO** - Reliable WebSocket implementation
+- **SQLAlchemy** - Robust ORM with great documentation
+- **Contributors** - Thank you to all who have contributed
 
-## Support
+## Disclaimer
 
-If you encounter any issues or have questions:
+⚠️ **Educational Purpose Only**
 
-1. Check the [Issues](https://github.com/yourusername/martingale/issues) page
-2. Create a new issue with detailed information
-3. Contact the maintainers
+This is a **paper trading application** for educational and demonstration purposes. 
+
+- No real money or financial instruments are involved
+- Prices are simulated using mathematical models (Geometric Brownian Motion)
+- Not suitable for real trading decisions
+- Not financial advice
+- Use at your own risk
+
+For real trading, use licensed financial platforms with proper regulatory oversight.
 
 ---
 
-**Disclaimer**: This is a paper trading application for educational purposes only. No real money or assets are involved.
+**Author**: Richard Correro  
+**Repository**: [github.com/rcorrero/martingale](https://github.com/rcorrero/martingale)  
+**Last Updated**: November 2025  
+**Version**: 2.0 (Expiring Assets + Input Validation)

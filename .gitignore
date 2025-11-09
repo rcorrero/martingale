@@ -22,6 +22,9 @@ instance/
 # Pricing model
 pricing/
 
+# Dev log
+.development*
+
 # Notebooks
 notebooks/
 

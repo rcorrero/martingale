@@ -84,8 +84,85 @@ TASK COMPLETION RULES:
   - README.md file exists and is up to date
   - User is provided with clear instructions to debug/launch the project
 
+DOCUMENTATION UPDATE RULES:
+- **ALWAYS update documentation when making substantive code changes**:
+  - After modifying core application logic (app.py, models.py, validators.py, asset_manager.py, etc.)
+  - After adding/removing API endpoints or WebSocket events
+  - After changing database schema or adding migrations
+  - After modifying configuration options or environment variables
+  - After changing architecture or data flow
+  - After adding/removing dependencies
+  - After implementing new features or security measures
+
+- **Documentation files to update**:
+  - README.md - Update if user-facing features, installation steps, or API endpoints change
+  - README_ARCHITECTURE.md - Update if architecture, data flows, or technical implementation changes
+  - Relevant specialized docs (SECURITY.md, VALIDATION_ARCHITECTURE.md, etc.) - Update if related functionality changes
+  - Inline code comments and docstrings - Update to match code changes
+
+- **Documentation update workflow**:
+  1. Make code changes
+  2. Test changes to verify they work
+  3. Identify which documentation files need updates
+  4. Update documentation to reflect changes accurately
+  5. Verify documentation is consistent with code
+  6. Mention documentation updates in response to user
+
+- **What to document**:
+  - New/changed functionality and how to use it
+  - Modified API endpoints, parameters, or responses
+  - Updated configuration options with defaults and examples
+  - Changed architecture or component interactions
+  - New security features or validation rules
+  - Breaking changes or migration requirements
+  - Updated installation or deployment steps
+
+TESTING RULES:
+- **ALWAYS create and run tests for substantive code changes**:
+  - New features or functionality (create new test file or add to existing)
+  - Bug fixes (add regression test to prevent reoccurrence)
+  - API endpoint changes (test request/response formats)
+  - Database model changes (test CRUD operations, constraints)
+  - Validation logic changes (test edge cases, bounds, error handling)
+  - Security features (test authentication, authorization, input validation)
+  - Business logic changes (test calculations, state transitions)
+
+- **Test file naming and organization**:
+  - Unit tests: `test_<module_name>.py` (e.g., `test_validators.py`, `test_asset_manager.py`)
+  - Integration tests: `test_<feature>_integration.py` (e.g., `test_trading_integration.py`)
+  - Place tests in project root or `tests/` directory
+  - Follow existing test patterns in the project
+
+- **Testing workflow**:
+  1. Make code changes
+  2. Create or update test file with new test cases
+  3. Run tests to verify implementation: `python -m unittest test_<module>.py -v`
+  4. Fix any failures and re-run tests
+  5. Run full test suite if available: `python -m unittest discover -v`
+  6. Report test results to user (number of tests run, passed/failed)
+
+- **What to test**:
+  - **Happy path**: Normal inputs produce expected outputs
+  - **Edge cases**: Boundary values, empty inputs, maximum values
+  - **Error cases**: Invalid inputs, malformed data, type errors
+  - **Security**: SQL injection attempts, XSS, CSRF protection
+  - **Business rules**: Insufficient funds, expired assets, duplicate operations
+  - **Data integrity**: Database constraints, transaction atomicity
+  - **Integration**: Component interactions, API contracts
+
+- **Test quality standards**:
+  - Each test should be independent (no shared state between tests)
+  - Use descriptive test names that explain what is being tested
+  - Include docstrings explaining test purpose and expectations
+  - Test both positive and negative cases
+  - Mock external dependencies (database, API calls) when appropriate
+  - Assert specific expected values, not just "truthy" results
+  - Clean up test data after each test (in tearDown method)
+
 Before starting a new task in the above plan, update progress in the plan.
 -->
 - Work through each checklist item systematically.
 - Keep communication concise and focused.
 - Follow development best practices.
+- **Always update relevant documentation after substantive code changes.**
+- **Always create and run unit tests for substantive code changes.**
