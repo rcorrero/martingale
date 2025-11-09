@@ -11,7 +11,7 @@ Martingale is a full-featured paper trading platform that simulates futures-styl
 ### Trading & Markets
 - **Real-time Price Updates**: WebSocket-based streaming price data with 1-second updates
 - **Dynamic Asset Pool**: System maintains minimum of 16 active tradeable assets
-- **Expiring Assets**: Each asset has a random expiration date (1-30 days)
+- **Expiring Assets**: Each asset has a random expiration time (5-30 minutes) for fast-paced gameplay
 - **Geometric Brownian Motion**: Price evolution with configurable drift and volatility
 - **VWAP Tracking**: Volume-weighted average price calculation per user position
 
@@ -757,8 +757,8 @@ curl http://localhost:5001/health
 Edit `Asset.create_new_asset()` in `models.py`:
 
 ```python
-# Change expiration range (default 1-30 days)
-days_to_expiry = random.randint(7, 14)  # 1-2 weeks only
+# Change expiration range (default 5-30 minutes)
+minutes_to_expiry = random.randint(10, 20)  # 10-20 minutes only
 
 # Change volatility range (default 0.1%-20%)
 volatility = random.uniform(0.01, 0.10)  # 1%-10% only

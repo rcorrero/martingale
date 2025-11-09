@@ -346,7 +346,7 @@ The validation system includes a comprehensive test suite (`test_validators.py`)
 
 **Running Tests:**
 ```bash
-python -m unittest test_validators -v
+pytest test_validators.py -v
 ```
 
 **Test Results:**

@@ -100,9 +100,9 @@ TESTING RULES:
 - **Testing workflow**:
   1. Make code changes
   2. Create or update test file with new test cases
-  3. Run tests to verify implementation: `python -m unittest test_<module>.py -v`
+  3. Run tests to verify implementation: `pytest test_<module>.py -v`
   4. Fix any failures and re-run tests
-  5. Run full test suite if available: `python -m unittest discover -v`
+  5. Run full test suite if available: `pytest -v`
   6. Report test results to user (number of tests run, passed/failed)
 
 - **What to test**:

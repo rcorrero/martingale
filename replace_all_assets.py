@@ -5,7 +5,7 @@ This will:
 1. Mark all existing assets as inactive
 2. Clear all user holdings
 3. Return holdings value to users' cash
-4. Create 16 new assets with 5-480 minute expiration times
+4. Create 16 new assets with 5-30 minute expiration times
 """
 import os
 
@@ -66,7 +66,7 @@ def replace_all_assets():
                 asset = Asset.create_new_asset(
                     initial_price=100.0,
                     volatility=None,  # Random
-                    minutes_to_expiry=None  # Random 5-480 minutes
+                    minutes_to_expiry=None  # Random 5-30 minutes
                 )
                 db.session.add(asset)
                 new_assets.append(asset)

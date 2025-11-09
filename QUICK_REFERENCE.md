@@ -78,9 +78,9 @@ INITIAL_ASSET_PRICE=100           # Starting price
 
 ### Code Customization
 
-**Change expiration range** (models.py, line 65):
+**Change expiration range** (models.py, line ~310):
 ```python
-days_to_expiry = random.randint(7, 14)  # 1-2 weeks
+minutes_to_expiry = random.randint(10, 20)  # 10-20 minutes
 ```
 
 **Change volatility range** (models.py, line 62):

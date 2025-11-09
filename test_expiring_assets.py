@@ -14,16 +14,16 @@ def test_asset_creation(app):
     
     with app.app_context():
         # Create a few test assets
-        asset1 = Asset.create_new_asset(initial_price=100.0, minutes_to_expiry=1440)
-        asset2 = Asset.create_new_asset(initial_price=100.0, minutes_to_expiry=21600)
-        asset3 = Asset.create_new_asset(initial_price=100.0, minutes_to_expiry=43200)
+        asset1 = Asset.create_new_asset(initial_price=100.0, minutes_to_expiry=10)
+        asset2 = Asset.create_new_asset(initial_price=100.0, minutes_to_expiry=20)
+        asset3 = Asset.create_new_asset(initial_price=100.0, minutes_to_expiry=30)
         
         db.session.add_all([asset1, asset2, asset3])
         db.session.commit()
         
-        print(f"✓ Created asset {asset1.symbol} (expires in 1 day)")
-        print(f"✓ Created asset {asset2.symbol} (expires in 15 days)")
-        print(f"✓ Created asset {asset3.symbol} (expires in 30 days)")
+        print(f"✓ Created asset {asset1.symbol} (expires in 10 minutes)")
+        print(f"✓ Created asset {asset2.symbol} (expires in 20 minutes)")
+        print(f"✓ Created asset {asset3.symbol} (expires in 30 minutes)")
         
         # Verify
         active_count = Asset.query.filter_by(is_active=True).count()

@@ -44,7 +44,7 @@ The Martingale trading platform has been successfully redesigned to support **dy
 - Symbol: Random 3 letters (e.g., "KLM", "PQR")
 - Initial Price: $100 (configurable)
 - Volatility: Random 0.1% - 20%
-- Expiration: Random 1-30 days from creation
+- Expiration: Random 5-30 minutes from creation
 ```
 
 #### 2. Automatic Settlement
@@ -181,7 +181,7 @@ INITIAL_ASSET_PRICE=100           # Starting price for new assets
 **Asset Generation** (`models.py:Asset.create_new_asset`):
 - Symbol length (default: 3)
 - Volatility range (default: 0.1% - 20%)
-- Expiration range (default: 1-30 days)
+- Expiration range (default: 5-30 minutes)
 
 **Settlement Timing** (`config.py`):
 - Check interval (default: 60 seconds)
@@ -220,7 +220,7 @@ tail -f martingale.log | grep -i "expir"
 
 ### For New Installations
 1. Run `python app.py` - automatically creates schema and initializes 10 assets
-2. Assets start expiring after 1-30 days
+2. Assets start expiring after 5-30 minutes
 3. System self-manages from there
 
 ### For Existing Installations
@@ -244,7 +244,7 @@ See `MIGRATION_EXPIRING_ASSETS.md` for detailed migration steps.
 ```
 "Expiring asset ABC at price 102.34"
 "Settled X units of ABC for user Y at $Z"
-"Created new asset XYZ with volatility 0.05, expires in 15 days"
+"Created new asset XYZ with volatility 0.05, expires in 20 minutes"
 "Processing asset expirations... expired_assets=2, positions_settled=5"
 ```
 

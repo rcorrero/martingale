@@ -14,7 +14,7 @@ The Martingale trading platform has been redesigned to support **expiring assets
 - Portfolio holdings initialized with all assets set to 0
 
 **After:**
-- Assets have expiration dates ranging from 1 day to 30 days
+- Assets have expiration dates ranging from 5 to 30 minutes
 - System automatically creates new assets to maintain a minimum pool (default: 10 active assets)
 - Each asset has random symbol (3 uppercase letters), volatility (0.1% - 20%), and expiration date
 - Portfolios start empty - holdings added only when user trades
@@ -198,10 +198,10 @@ If you've customized `main.js`, update to:
 
 1. **Verify Asset Creation**: Check `/api/assets/summary` - should show 10 active assets
 2. **Test Trading**: Place buy/sell orders for active assets
-3. **Test Expiration**: Create test asset expiring in 2 minutes:
+3. **Test Expiration**: Create test asset expiring in 5 minutes:
    ```python
    from datetime import datetime, timedelta
-   asset = Asset.create_new_asset(days_to_expiry=0.0014)  # ~2 minutes
+   asset = Asset.create_new_asset(minutes_to_expiry=5)  # 5 minutes
    db.session.add(asset)
    db.session.commit()
    # Register with price service
@@ -274,8 +274,8 @@ When an asset expires:
 - User holds multiple expired assets simultaneously
 - Asset expires during active trading session
 - Settlement with fractional shares
-- Very short expiration (< 1 hour)
-- Very long expiration (30 days)
+- Very short expiration (5 minutes)
+- Maximum expiration (30 minutes)
 
 ## Rollback Procedure
 
@@ -318,8 +318,8 @@ Edit `Asset.create_new_asset()` in `models.py`:
 # Change symbol length (default 3)
 symbol = Asset.generate_symbol(length=4)
 
-# Change expiration range (default 1-30 days)
-days_to_expiry = random.randint(7, 14)  # 1-2 weeks only
+# Change expiration range (default 5-30 minutes)
+minutes_to_expiry = random.randint(10, 20)  # 10-20 minutes only
 
 # Change volatility range (default 0.1%-20%)
 volatility = random.uniform(0.01, 0.10)  # 1%-10% only
@@ -342,7 +342,7 @@ Key log messages:
 ```
 "Expiring asset ABC at price 102.34"
 "Settled 10 units of ABC for user 5 at $102.34 = $1023.40"
-"Created new asset XYZ with volatility 0.0543, expires in 15 days"
+"Created new asset XYZ with volatility 0.0543, expires in 20 minutes"
 "Processing asset expirations... expired_assets=2, positions_settled=5"
 ```
 

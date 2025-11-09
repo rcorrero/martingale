@@ -278,13 +278,13 @@ class Asset(db.Model):
     
     @staticmethod
     def create_new_asset(initial_price=100.0, volatility=None, drift=None, minutes_to_expiry=None):
-        """Create a new asset with random expiration between 5 minutes and 8 hours.
+        """Create a new asset with random expiration between 5 and 30 minutes.
         
         Args:
             initial_price: Starting price for the asset
             volatility: Price volatility (random if None)
             drift: Mean return rate (random from normal distribution if None)
-            minutes_to_expiry: Specific minutes to expiry (random 5-480 if None)
+            minutes_to_expiry: Specific minutes to expiry (random 5-30 if None)
         
         Returns:
             New Asset instance (not yet added to session)
@@ -305,13 +305,13 @@ class Asset(db.Model):
         # Clip drift to [-sigma, sigma] range
         drift = max(-volatility, min(volatility, drift))
         
-        # Random expiration between 5 minutes and 8 hours (480 minutes)
-        # Using exponential distribution for average around 30 minutes
+        # Random expiration between 5 and 30 minutes
+        # Using exponential distribution for average around 10 minutes
         if minutes_to_expiry is None:
-            # Exponential distribution with mean ~25 minutes, clamped to range
+            # Exponential distribution with mean ~10 minutes, clamped to range
             lambda_param = 1.0 / 10.0
             minutes_to_expiry = random.expovariate(lambda_param)
-            # Clamp between 5 and 480 minutes
+            # Clamp between 5 and 30 minutes (30 min max for faster gameplay)
             minutes_to_expiry = max(5, min(30, minutes_to_expiry))
 
         expires_at = current_utc() + timedelta(minutes=minutes_to_expiry)
