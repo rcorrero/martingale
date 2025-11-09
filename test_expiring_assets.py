@@ -2,8 +2,12 @@
 Test script for expiring assets system.
 Run this to verify the asset lifecycle works correctly.
 """
+import sys
+import os
 import pytest
 from datetime import timedelta
+from app import app
+from config import config
 from models import db, Asset, User, Portfolio, Settlement, Transaction, current_utc
 from asset_manager import AssetManager
 

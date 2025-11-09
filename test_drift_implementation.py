@@ -7,6 +7,7 @@ Verifies:
 3. Backward compatibility with existing assets
 4. Drift distribution matches specification
 """
+import sys
 import pytest
 import numpy as np
 from models import db, Asset, current_utc
