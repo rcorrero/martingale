@@ -25,6 +25,9 @@ pricing/
 # Notebooks
 notebooks/
 
+# Development logs
+.development_log.md
+
 # User data files
 users.json
 portfolios.json

@@ -2816,7 +2816,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Confirm sell all
-        if (confirm(`Are you sure you want to sell all ${positions.length} positions?`)) {
+        if (confirm(`Are you sure you want to sell ${positions.length} position(s)?`)) {
             // Disable the button to prevent double-clicking
             sellAllBtn.disabled = true;
             sellAllBtn.style.opacity = '0.6';
@@ -2825,7 +2825,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let successCount = 0;
             let failCount = 0;
             
-            tradeMessage.textContent = `Selling ${positions.length} positions... (0/${positions.length})`;
+            tradeMessage.textContent = `Selling ${positions.length} position(s)... (0/${positions.length})`;
             tradeMessage.style.color = '#00d4ff'; // Terminal cyan
             tradeMessage.style.background = 'rgba(0, 212, 255, 0.1)';
             tradeMessage.style.border = '1px solid rgba(0, 212, 255, 0.3)';
@@ -3358,6 +3358,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <canvas id="mobile-chart-${asset.symbol}"></canvas>
             </div>
         `;
+        // Set the color of the symbol to the asset's associated color
+        const symbolEl = card.querySelector('.mobile-asset-symbol');
+        if (symbolEl) {
+            symbolEl.style.color = getInstrumentColor(asset.symbol, asset);
+        }
 
         return card;
     }
@@ -3368,29 +3373,58 @@ document.addEventListener('DOMContentLoaded', () => {
         // Store the currently displayed symbol before updating
         const currentSymbol = mobileAssets[currentMobileAssetIndex]?.symbol;
 
-        mobileAssets = assets;
+        // Build a map of new asset symbols
+        const newAssetSymbols = new Set(assets.map(a => a.symbol));
+        // Build a map of current asset symbols
+        const currentAssetSymbols = new Set(mobileAssets.map(a => a.symbol));
 
-        // Store search container if it exists
-        const searchContainer = mobileCarousel.querySelector('.mobile-asset-search-container');
-        
-        // Remove only the asset cards, not the search container
+        // Remove cards for assets that have expired
         const cards = mobileCarousel.querySelectorAll('.mobile-asset-card');
-        cards.forEach(card => card.remove());
-        
-        // Clear charts
-        mobileCharts = [];
-
-        // Create cards for each asset
-        mobileAssets.forEach((asset, index) => {
-            const card = createMobileAssetCard(asset, index);
-            mobileCarousel.appendChild(card);
-
-            // Create chart for this asset
-            const canvas = card.querySelector(`#mobile-chart-${asset.symbol}`);
-            if (canvas) {
-                createMobileAssetChart(canvas, asset);
+        cards.forEach(card => {
+            const symbol = card.querySelector('.mobile-asset-symbol')?.textContent;
+            if (symbol && !newAssetSymbols.has(symbol)) {
+                // Remove chart for this symbol
+                const chartIdx = mobileCharts.findIndex(c => c.symbol === symbol);
+                if (chartIdx !== -1) {
+                    if (mobileCharts[chartIdx].chart) {
+                        mobileCharts[chartIdx].chart.destroy();
+                    }
+                    mobileCharts.splice(chartIdx, 1);
+                }
+                card.remove();
             }
         });
+
+        // Add cards for new assets
+        assets.forEach((asset, index) => {
+            if (!currentAssetSymbols.has(asset.symbol)) {
+                const card = createMobileAssetCard(asset, index);
+                // Insert in correct order
+                // Find the next card (by index) to insert before
+                let inserted = false;
+                const allCards = mobileCarousel.querySelectorAll('.mobile-asset-card');
+                for (let i = 0; i < allCards.length; i++) {
+                    const cardSymbol = allCards[i].querySelector('.mobile-asset-symbol')?.textContent;
+                    const newIdx = assets.findIndex(a => a.symbol === cardSymbol);
+                    if (newIdx > index) {
+                        mobileCarousel.insertBefore(card, allCards[i]);
+                        inserted = true;
+                        break;
+                    }
+                }
+                if (!inserted) {
+                    mobileCarousel.appendChild(card);
+                }
+                // Create chart for this asset
+                const canvas = card.querySelector(`#mobile-chart-${asset.symbol}`);
+                if (canvas) {
+                    createMobileAssetChart(canvas, asset);
+                }
+            }
+        });
+
+        // Update mobileAssets to the new list
+        mobileAssets = assets;
 
         // Try to maintain the same symbol if it still exists
         if (currentSymbol) {
@@ -3411,7 +3445,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Initialize expiry timestamps and styling for all assets
         updateMobileExpiry(mobileAssets, true);
-        
+
         // Update display without animations to prevent visual glitches
         updateMobileAssetDisplay(true);
     }
@@ -3995,7 +4029,8 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         mobileQuantityTitle.textContent = `${tradeType === 'buy' ? 'Buy' : 'Sell'} ${asset.symbol}`;
-        mobileQuantityInput.value = '';
+        const quantityHeld = userPortfolio.holdings && userPortfolio.holdings[asset.symbol] ? userPortfolio.holdings[asset.symbol] : 0;
+        mobileQuantityInput.value = quantityHeld;
         mobileQuantityInput.placeholder = tradeType === 'buy' ? 'Enter quantity' : 'Enter quantity';
         
         // Update buying power display

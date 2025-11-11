@@ -16,16 +16,15 @@ def add_short_expiry_asset():
     
     with app.app_context():
         try:
-            # Create asset with 5 minute expiration
-            minutes_to_expiry = 1
+            minutes_to_expiry = 0.5
             expires_at = current_utc() + timedelta(minutes=minutes_to_expiry)
             
             symbol = Asset.generate_symbol()
             
             asset = Asset(
                 symbol=symbol,
-                initial_price=0.011,
-                current_price=0.011,
+                initial_price=100.0,
+                current_price=100.0,
                 volatility=0.05,  # 5% volatility
                 color=Asset.get_random_color(),
                 expires_at=expires_at,
