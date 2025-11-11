@@ -40,8 +40,8 @@ class Config:
     
     # Asset lifecycle settings
     MIN_ACTIVE_ASSETS = int(os.environ.get('MIN_ACTIVE_ASSETS', 16))  # Minimum active assets to maintain
-    EXPIRATION_CHECK_INTERVAL = int(os.environ.get('EXPIRATION_CHECK_INTERVAL', 60))  # Check every 60 seconds
-    CLEANUP_OLD_ASSETS_DAYS = int(os.environ.get('CLEANUP_OLD_ASSETS_DAYS', 30))  # Remove assets older than 30 days
+    EXPIRATION_CHECK_INTERVAL = int(os.environ.get('EXPIRATION_CHECK_INTERVAL', 1))
+    CLEANUP_OLD_ASSETS_DAYS = int(os.environ.get('CLEANUP_OLD_ASSETS_DAYS', 7))  # Remove assets older than 30 days
 
     # Legacy ASSETS config - now used only as fallback/migration
     # New assets are created dynamically with expiration dates

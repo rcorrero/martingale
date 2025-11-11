@@ -1522,7 +1522,7 @@ def price_update_thread():
 def expiration_check_thread():
     """Background thread to check for and process expired assets."""
     while True:
-        time.sleep(app.config.get('EXPIRATION_CHECK_INTERVAL', 60))  # Check every minute by default
+        time.sleep(app.config.get('EXPIRATION_CHECK_INTERVAL', 1))  # Check every second by default
         
         try:
             with app.app_context():
