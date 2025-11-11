@@ -315,7 +315,7 @@ class HybridPriceService:
         # Check if any price needs updating (older than 2 seconds)
         needs_update = False
         for symbol, data in self.fallback.assets.items():
-            if data.get('last_update') is None or (current_time - data['last_update']) > 2000:
+            if data.get('last_update') is None or (current_time - data['last_update']) > 1000: #Changed from 2000
                 needs_update = True
                 break
         
