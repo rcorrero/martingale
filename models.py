@@ -270,12 +270,16 @@ class Asset(db.Model):
     @staticmethod
     def generate_symbol(length=3):
         """Generate a random symbol using uppercase letters."""
+        _n_cycles = 0
         while True:
             symbol = ''.join(random.choices(string.ascii_uppercase, k=length))
             # Check if symbol already exists
             if not Asset.query.filter_by(symbol=symbol).first():
                 return symbol
-    
+            _n_cycles += 1
+            if _n_cycles > 100000:
+                raise ValueError("Failed to generate a unique symbol after 1000 attempts")
+
     @staticmethod
     def create_new_asset(initial_price=100.0, volatility=None, drift=None, minutes_to_expiry=None):
         """Create a new asset with random expiration between 5 minutes and 8 hours.

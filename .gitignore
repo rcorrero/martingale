@@ -19,6 +19,9 @@ venv.bak/
 # Flask instance folder
 instance/
 
+# DB Backups
+dbs/
+
 # Pricing model
 pricing/
 
