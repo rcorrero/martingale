@@ -268,11 +268,13 @@ class Asset(db.Model):
         return random.choice(Asset.COLOR_PALETTE)
     
     @staticmethod
-    def generate_symbol(length=3):
+    def generate_symbol(length=3, include_day_of_month=False):
         """Generate a random symbol using uppercase letters."""
         _n_cycles = 0
         while True:
             symbol = ''.join(random.choices(string.ascii_uppercase, k=length))
+            if include_day_of_month:
+                symbol += str(current_utc().minute)
             # Check if symbol already exists
             if not Asset.query.filter_by(symbol=symbol).first():
                 return symbol
