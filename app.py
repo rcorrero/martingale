@@ -1510,6 +1510,7 @@ def update_prices():
                     })
     except Exception as e:
         logger.error(f"Price update error: {e}")
+        db.session.rollback()
 
 # Background thread for price updates
 def price_update_thread():
@@ -1556,12 +1557,46 @@ def expiration_check_thread():
             import traceback
             logger.error(traceback.format_exc())
 
+def cleanup_old_assets_thread():
+    """Background thread to clean up old expired assets."""
+    while True:
+        try:
+            with app.app_context():
+                logger.info("Cleaning up old expired assets...")
+                cutoff_time = current_utc() - timedelta(days=app.config.get('CLEANUP_OLD_ASSETS_DAYS', 7))
+                old_assets = Asset.query.filter(
+                    Asset.is_active == False,
+                    Asset.expires_at < cutoff_time
+                ).all()
+                
+                num_deleted = 0
+                for asset in old_assets:
+                    db.session.delete(asset)
+                    num_deleted += 1
+                
+                if num_deleted > 0:
+                    db.session.commit()
+                    logger.info(f"Deleted {num_deleted} old expired assets")
+                else:
+                    logger.info("No old expired assets to delete")
+                
+        except Exception as e:
+            logger.error(f"Error in cleanup old assets thread: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            db.session.rollback()
+
+        time.sleep(app.config.get('CLEANUP_INTERVAL_HOURS', 1) * 3600)  # Sleep for configured hours
+
 # Start background threads
 price_thread = threading.Thread(target=price_update_thread, daemon=True)
 price_thread.start()
 
 expiration_thread = threading.Thread(target=expiration_check_thread, daemon=True)
 expiration_thread.start()
+
+cleanup_thread = threading.Thread(target=cleanup_old_assets_thread, daemon=True)
+cleanup_thread.start()
 
 if __name__ == '__main__':
     # Initialize database tables

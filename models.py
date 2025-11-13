@@ -268,7 +268,7 @@ class Asset(db.Model):
         return random.choice(Asset.COLOR_PALETTE)
     
     @staticmethod
-    def generate_symbol(length=4):
+    def generate_symbol(length=3):
         """Generate a random symbol using uppercase letters."""
         _n_cycles = 0
         while True:

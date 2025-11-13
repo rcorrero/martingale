@@ -290,7 +290,7 @@ class AssetManager:
         logger.info(f"Initializing asset pool with {create_count} assets")
         return self.create_new_assets(count=create_count)
     
-    def cleanup_old_assets(self, days_old: int = 30) -> int:
+    def cleanup_old_assets(self, days_old: int = 7) -> int:
         """Remove old expired assets from database to prevent bloat.
         
         Args:
