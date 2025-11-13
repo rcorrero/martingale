@@ -4030,7 +4030,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         mobileQuantityTitle.textContent = `${tradeType === 'buy' ? 'Buy' : 'Sell'} ${asset.symbol}`;
         const quantityHeld = userPortfolio.holdings && userPortfolio.holdings[asset.symbol] ? userPortfolio.holdings[asset.symbol] : 0;
-        mobileQuantityInput.value = quantityHeld;
+        // mobileQuantityInput.value = quantityHeld;
+        // if (tradeType === 'sell') mobileQuantityInput.value = quantityHeld
+        // else mobileQuantityInput.value = '';
+        mobileQuantityInput.value = tradeType === 'sell' ? quantityHeld : '';
         mobileQuantityInput.placeholder = tradeType === 'buy' ? 'Enter quantity' : 'Enter quantity';
         
         // Update buying power display
