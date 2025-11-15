@@ -185,13 +185,16 @@ h2 {
 }
 
 .change-password-btn {
-    color: var(--terminal-text);
+    /* color: var(--terminal-text); */
     border-color: var(--terminal-border-strong);
+    /* border-color: rgba(59, 246, 193, 0.45); */
 }
 
 .change-password-btn:hover {
     background: var(--terminal-accent);
+    /* background: var(--terminal-danger); */
     color: var(--terminal-bg);
+    /* box-shadow: 0 12px 20px rgba(59, 246, 193, 0.25); */
     box-shadow: 0 12px 20px rgba(59, 130, 246, 0.25);
     transform: translateY(-1px);
 }
