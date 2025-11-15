@@ -26,7 +26,10 @@ class AssetManager:
         self.price_service = price_service
         self.socketio = socketio
         self.min_active_assets = app_config.get('MIN_ACTIVE_ASSETS', 16)
-        self.initial_asset_price = app_config.get('INITIAL_ASSET_PRICE', 100.0)
+        if bool(app_config.get('RANDOM_INITIAL_ASSET_PRICE', True)):
+            self.initial_asset_price = None  # Randomized per asset
+        else:
+            self.initial_asset_price = app_config.get('INITIAL_ASSET_PRICE', 100.0)
     
     def get_active_assets(self) -> List[Asset]:
         """Get all currently active (non-expired) assets.

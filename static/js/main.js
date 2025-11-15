@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let portfolioHistoryRequest = null;
     let latestAssetsSnapshot = null;
 
-    const EXPIRING_NOTIFICATION_THRESHOLD = 300; // 5 minutes
+    const EXPIRING_NOTIFICATION_THRESHOLD = 120; // 2 minutes
     const EXPIRING_COUNTDOWN_THRESHOLD = 60;      // 1 minute
     const EXPIRING_SNOOZE_MS = 60000;             // 1 minute snooze after manual dismissal
 

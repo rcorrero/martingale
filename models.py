@@ -5,6 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta, timezone
+import numpy as np
 import json
 import random
 import string
@@ -283,7 +284,7 @@ class Asset(db.Model):
                 raise ValueError("Failed to generate a unique symbol after 1000 attempts")
 
     @staticmethod
-    def create_new_asset(initial_price=100.0, volatility=None, drift=None, minutes_to_expiry=None):
+    def create_new_asset(initial_price=None, volatility=None, drift=None, minutes_to_expiry=None):
         """Create a new asset with random expiration between 5 minutes and 8 hours.
         
         Args:
@@ -297,28 +298,52 @@ class Asset(db.Model):
         """
         symbol = Asset.generate_symbol()
         
-        # Random volatility between 0.1% and 20% if not specified
-        if volatility is None:
-            volatility = random.uniform(0.001, 0.20)
+        # # Random volatility between 0.1% and 20% if not specified
+        # if volatility is None:
+        #     volatility = random.uniform(0.001, 0.20)
         
-        # Random drift from normal distribution if not specified
-        # Standard deviation ~0.01 means drift is typically within 1% of zero
-        # (68% of values within ±0.01, 95% within ±0.02)
-        if drift is None:
-            drift = random.gauss(0.0, 0.001)
+        # # Random drift from normal distribution if not specified
+        # # Standard deviation ~0.01 means drift is typically within 1% of zero
+        # # (68% of values within ±0.01, 95% within ±0.02)
+        # if drift is None:
+        #     drift = random.gauss(0.0, 0.001)
+
+        if drift is None and volatility is not None:
+            drift = np.random.normal(0.0, 0.005)
+        elif volatility is None and drift is not None:
+            volatility = np.random.lognormal(mean=np.log(0.05), sigma=0.5)
+        elif drift is None and volatility is None:
+            mu_0 = -0.001
+            log_sigma_0 = np.log(0.05)
+            cov = np.array([
+                [0.001**2, 0.0],
+                [0.0, 0.5**2]
+            ])
+            drift, log_sigma = np.random.multivariate_normal([mu_0, log_sigma_0], cov)
+            volatility = np.exp(log_sigma)
+
+        # Random initial price if not specified
+        if initial_price is None:
+            mean_init = 100.0
+            sigma_logn = 1.0  # Reasonable spread
+            mu_logn = np.log(mean_init) - (sigma_logn**2) / 2
+            initial_price = np.random.lognormal(mean=mu_logn, sigma=sigma_logn)
+
         
-        # Ensure |drift| <= sigma to prevent explosive price movements
-        # Clip drift to [-sigma, sigma] range
-        drift = max(-volatility, min(volatility, drift))
+        # # Ensure |drift| <= sigma to prevent explosive price movements
+        # # Clip drift to [-sigma, sigma] range
+        # drift = max(-volatility, min(volatility, drift))
         
-        # Random expiration between 5 minutes and 8 hours (480 minutes)
         # Using exponential distribution for average around 30 minutes
         if minutes_to_expiry is None:
-            # Exponential distribution with mean ~25 minutes, clamped to range
-            lambda_param = 1.0 / 10.0
-            minutes_to_expiry = random.expovariate(lambda_param)
-            # Clamp between 5 and 480 minutes
-            minutes_to_expiry = max(5, min(30, minutes_to_expiry))
+            # # Exponential distribution with mean ~25 minutes, clamped to range
+            # lambda_param = 1.0 / 10.0  # mean = 1/lambda minutes
+            # minutes_to_expiry = random.expovariate(lambda_param)
+            mu = 10
+            sigma = 2
+            minutes_to_expiry = random.normalvariate(mu, sigma)
+            # Clamp time to expiry
+            minutes_to_expiry = max(5, min(15, minutes_to_expiry))
 
         expires_at = current_utc() + timedelta(minutes=minutes_to_expiry)
 

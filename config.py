@@ -35,6 +35,7 @@ class Config:
     # Price service configuration
     PRICE_SERVICE_URL = os.environ.get('PRICE_SERVICE_URL', 'http://localhost:5001')
     
+    RANDOM_INITIAL_ASSET_PRICE = bool(os.environ.get('RANDOM_INITIAL_ASSET_PRICE', 'True').lower() in ['true', '1', 'yes'])
     # Initial asset price
     INITIAL_ASSET_PRICE = float(os.environ.get('INITIAL_ASSET_PRICE', 100))
     
