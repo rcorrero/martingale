@@ -261,6 +261,20 @@ class RegisterForm(FlaskForm):
     ])
     submit = SubmitField('Register')
 
+# Change Password Form
+class ChangePasswordForm(FlaskForm):
+    current_password = PasswordField('Current Password', validators=[DataRequired()])
+    new_password = PasswordField('New Password', validators=[
+        DataRequired(),
+        Length(min=8, message='Password must be at least 8 characters long.'),
+        validate_password_strength
+    ])
+    confirm_password = PasswordField('Confirm New Password', validators=[
+        DataRequired(),
+        EqualTo('new_password', message='Passwords must match.')
+    ])
+    submit = SubmitField('Change Password')
+
 @login_manager.user_loader
 def load_user(user_id):
     try:
@@ -440,10 +454,36 @@ def register():
     
     return render_template('register.html', form=form)
 
+# Add change password route
+@app.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    form = ChangePasswordForm()
+    if form.validate_on_submit():
+        user = current_user
+        if not user.check_password(form.current_password.data):
+            flash('Current password is incorrect.')
+            return render_template('change_password.html', form=form)
+        if form.current_password.data == form.new_password.data:
+            flash('New password must be different from the current password.')
+            return render_template('change_password.html', form=form)
+        try:
+            user.set_password(form.new_password.data)
+            db.session.commit()
+            flash('Your password has been changed successfully.')
+            return redirect(url_for('index'))
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Password change error: {e}")
+            flash('Password change failed. Please try again.')
+            return render_template('change_password.html', form=form)
+    return render_template('change_password.html', form=form)
+
 @app.route('/logout')
 @login_required
 def logout():
     logout_user()
+    session.pop('_flashes', None)
     return redirect(url_for('login'))
 
 @app.route('/about')

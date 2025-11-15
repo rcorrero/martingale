@@ -115,6 +115,7 @@
                 <div class="mobile-user-actions">
                     <a href="{{ url_for('about') }}" class="about-btn">About</a>
                     <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+                    <a href="{{ url_for('change_password') }}" class="change-password-btn">Change Password</a>
                 </div>
             </div>
             <div class="mobile-portfolio-section">
@@ -213,6 +214,7 @@
                 <span class="user-id">USER ID: {{ current_user.id }}</span>
                 <a href="{{ url_for('about') }}" class="about-btn">About</a>
                 <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+                <a href="{{ url_for('change_password') }}" class="change-password-btn">Change Password</a> |
             </div>
         </div>
         <div class="main-content">
