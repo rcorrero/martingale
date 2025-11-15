@@ -23,7 +23,7 @@ class User(UserMixin, db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)  # Increased from 120 to 255 for scrypt hashes
+    password_hash = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, default=current_utc)
     
     # Relationship to portfolio
@@ -230,7 +230,8 @@ class Asset(db.Model):
     __tablename__ = 'assets'
     
     id = db.Column(db.Integer, primary_key=True)
-    symbol = db.Column(db.String(10), nullable=False, unique=True, index=True)
+    # symbol = db.Column(db.String(10), nullable=False, unique=True, index=True)
+    symbol = db.Column(db.String(10), nullable=False, index=True)
     initial_price = db.Column(db.Float, nullable=False)
     current_price = db.Column(db.Float, nullable=False)
     volatility = db.Column(db.Float, default=0.02)
@@ -268,45 +269,59 @@ class Asset(db.Model):
         """Get a random color from the palette."""
         return random.choice(Asset.COLOR_PALETTE)
     
+    # @staticmethod
+    # def generate_symbol(length=3, include_day_of_month=False):
+    #     """Generate a random symbol using uppercase letters."""
+    #     _n_cycles = 0
+    #     while True:
+    #         symbol = ''.join(random.choices(string.ascii_uppercase, k=length))
+    #         if include_day_of_month:
+    #             symbol += str(current_utc().minute)
+    #         # Check if symbol already exists
+    #         if not Asset.query.filter_by(symbol=symbol).first():
+    #             return symbol
+    #         _n_cycles += 1
+    #         if _n_cycles > 100000:
+    #             raise ValueError("Failed to generate a unique symbol after 1000 attempts")
+            
     @staticmethod
-    def generate_symbol(length=3, include_day_of_month=False):
-        """Generate a random symbol using uppercase letters."""
+    def generate_symbol(length=3, include_day_of_month=False, exclude_symbols=None):
+        """Generate a random symbol using uppercase letters, avoiding recent/active symbols and explicit exclusions.
+        Args:
+            length: Length of the symbol (default 3)
+            include_day_of_month: If True, append minute to symbol
+            exclude_symbols: Optional set/list of symbols to explicitly exclude
+        """
         _n_cycles = 0
+        from datetime import timedelta
+        recent_cutoff = current_utc() - timedelta(hours=24)
+        exclude_set = set(exclude_symbols) if exclude_symbols else set()
         while True:
             symbol = ''.join(random.choices(string.ascii_uppercase, k=length))
             if include_day_of_month:
                 symbol += str(current_utc().minute)
-            # Check if symbol already exists
-            if not Asset.query.filter_by(symbol=symbol).first():
+            if symbol in exclude_set:
+                _n_cycles += 1
+                if _n_cycles > 100000:
+                    raise ValueError("Failed to generate a unique symbol after 10000 attempts")
+                continue
+            # Check if symbol is active or was active in the last 24 hours
+            recent_or_active = Asset.query.filter(
+                Asset.symbol == symbol,
+                ((Asset.is_active == True) | (Asset.expires_at >= recent_cutoff))
+            ).first()
+            if not recent_or_active:
                 return symbol
             _n_cycles += 1
             if _n_cycles > 100000:
-                raise ValueError("Failed to generate a unique symbol after 1000 attempts")
+                raise ValueError("Failed to generate a unique symbol after 10000 attempts")
 
     @staticmethod
-    def create_new_asset(initial_price=None, volatility=None, drift=None, minutes_to_expiry=None):
-        """Create a new asset with random expiration between 5 minutes and 8 hours.
-        
-        Args:
-            initial_price: Starting price for the asset
-            volatility: Price volatility (random if None)
-            drift: Mean return rate (random from normal distribution if None)
-            minutes_to_expiry: Specific minutes to expiry (random 5-480 if None)
-        
-        Returns:
-            New Asset instance (not yet added to session)
+    def create_new_asset(initial_price=None, volatility=None, drift=None, minutes_to_expiry=None, **kwargs):
+        """Create a new asset with random expiration.
+        Chooses a color not used by any currently active asset.
         """
-        symbol = Asset.generate_symbol()
-        
-        # # Random volatility between 0.1% and 20% if not specified
-        # if volatility is None:
-        #     volatility = random.uniform(0.001, 0.20)
-        
-        # # Random drift from normal distribution if not specified
-        # # Standard deviation ~0.01 means drift is typically within 1% of zero
-        # # (68% of values within ±0.01, 95% within ±0.02)
-        # if drift is None:
-        #     drift = random.gauss(0.0, 0.001)
+        symbol = Asset.generate_symbol(**kwargs)
 
         if drift is None and volatility is not None:
             drift = np.random.normal(0.0, 0.005)
@@ -329,23 +344,27 @@ class Asset(db.Model):
             mu_logn = np.log(mean_init) - (sigma_logn**2) / 2
             initial_price = np.random.lognormal(mean=mu_logn, sigma=sigma_logn)
 
-        
-        # # Ensure |drift| <= sigma to prevent explosive price movements
-        # # Clip drift to [-sigma, sigma] range
-        # drift = max(-volatility, min(volatility, drift))
-        
         # Using exponential distribution for average around 30 minutes
         if minutes_to_expiry is None:
-            # # Exponential distribution with mean ~25 minutes, clamped to range
-            # lambda_param = 1.0 / 10.0  # mean = 1/lambda minutes
-            # minutes_to_expiry = random.expovariate(lambda_param)
             mu = 10
             sigma = 2
             minutes_to_expiry = random.normalvariate(mu, sigma)
-            # Clamp time to expiry
             minutes_to_expiry = max(5, min(15, minutes_to_expiry))
 
         expires_at = current_utc() + timedelta(minutes=minutes_to_expiry)
+
+        # Choose a color not used by any currently active asset
+        # active_colors = set(
+        #     c[0] for c in db.session.query(Asset.color).filter(Asset.is_active).all()
+        # )
+        active_colors = set(
+            asset.color for asset in Asset.query.filter(Asset.is_active).all()
+        )
+        available_colors = [c for c in Asset.COLOR_PALETTE if c not in active_colors]
+        if available_colors:
+            color = random.choice(available_colors)
+        else:
+            color = Asset.get_random_color()  # fallback: allow reuse if all are taken
 
         asset = Asset(
             symbol=symbol,
@@ -353,11 +372,10 @@ class Asset(db.Model):
             current_price=initial_price,
             volatility=volatility,
             drift=drift,
-            color=Asset.get_random_color(),
+            color=color,
             expires_at=expires_at,
             is_active=True
         )
-        
         return asset
     
     def expire(self, final_price=None):

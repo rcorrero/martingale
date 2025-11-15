@@ -36,7 +36,7 @@ from validators import (
 if os.environ.get('FLASK_ENV') == 'production':
     # Production logging - only to stdout for Heroku
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.WARNING,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[logging.StreamHandler()]
     )
@@ -163,6 +163,48 @@ def ensure_settlement_asset_schema():
 
 
 ensure_settlement_asset_schema()
+
+
+def ensure_asset_symbol_not_unique():
+    """Ensure the assets.symbol column is not unique (drop unique constraint/index if present)."""
+    with app.app_context():
+        try:
+            inspector = inspect(db.engine)
+            if 'assets' not in inspector.get_table_names():
+                return
+            # Get all indexes and constraints on the assets table
+            indexes = inspector.get_indexes('assets')
+            unique_indexes = [idx for idx in indexes if idx.get('unique') and 'symbol' in idx.get('column_names', [])]
+            # For PostgreSQL, unique constraints may also appear in get_unique_constraints
+            unique_constraints = []
+            if hasattr(inspector, 'get_unique_constraints'):
+                unique_constraints = inspector.get_unique_constraints('assets')
+                unique_constraints = [uc for uc in unique_constraints if 'symbol' in uc.get('column_names', [])]
+
+            dropped = False
+            with db.engine.begin() as conn:
+                # Drop unique indexes
+                for idx in unique_indexes:
+                    idx_name = idx['name']
+                    logger.info(f"Dropping unique index on assets.symbol: {idx_name}")
+                    conn.execute(text(f'DROP INDEX IF EXISTS "{idx_name}"'))
+                    dropped = True
+                # Drop unique constraints (PostgreSQL)
+                for uc in unique_constraints:
+                    uc_name = uc['name']
+                    logger.info(f"Dropping unique constraint on assets.symbol: {uc_name}")
+                    conn.execute(text(f'ALTER TABLE assets DROP CONSTRAINT IF EXISTS "{uc_name}"'))
+                    dropped = True
+            if dropped:
+                logger.info("Removed unique constraint/index from assets.symbol")
+            else:
+                logger.info("No unique constraint/index found on assets.symbol; no action taken.")
+        except Exception as exc:
+            logger.error(f"Failed to ensure assets.symbol is not unique: {exc}")
+            db.session.rollback()
+
+
+ensure_asset_symbol_not_unique()
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -1195,7 +1237,7 @@ def handle_trade(data):
             return
         
         # Step 2: ASSET VALIDATION - Check asset exists and is tradeable
-        asset = Asset.query.filter_by(symbol=validated_symbol, is_active=True).first()
+        asset = Asset.query.filter_by(symbol=validated_symbol, is_active=True).order_by(Asset.created_at.desc()).first()
         if not asset:
             emit('trade_confirmation', {
                 'success': False, 
@@ -1591,12 +1633,16 @@ def cleanup_old_assets_thread():
 # Start background threads
 price_thread = threading.Thread(target=price_update_thread, daemon=True)
 price_thread.start()
+logger.info("Started price update thread")
 
 expiration_thread = threading.Thread(target=expiration_check_thread, daemon=True)
 expiration_thread.start()
+logger.info("Started expiration check thread")
 
-cleanup_thread = threading.Thread(target=cleanup_old_assets_thread, daemon=True)
-cleanup_thread.start()
+if app.config.get('ENABLE_CLEANUP_OLD_ASSETS', False):
+    cleanup_thread = threading.Thread(target=cleanup_old_assets_thread, daemon=True)
+    cleanup_thread.start()
+    logger.info("Started cleanup old assets thread")
 
 if __name__ == '__main__':
     # Initialize database tables

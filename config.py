@@ -42,28 +42,33 @@ class Config:
     # Asset lifecycle settings
     MIN_ACTIVE_ASSETS = int(os.environ.get('MIN_ACTIVE_ASSETS', 16))  # Minimum active assets to maintain
     EXPIRATION_CHECK_INTERVAL = int(os.environ.get('EXPIRATION_CHECK_INTERVAL', 1)) # in seconds
-    CLEANUP_OLD_ASSETS_DAYS = int(os.environ.get('CLEANUP_OLD_ASSETS_DAYS', 1))
+
+    ENABLE_CLEANUP_OLD_ASSETS = bool(os.environ.get('ENABLE_CLEANUP_OLD_ASSETS', 'False').lower() in ['true', '1', 'yes'])
+    CLEANUP_OLD_ASSETS_DAYS = int(os.environ.get('CLEANUP_OLD_ASSETS_DAYS', 7))
     CLEANUP_INTERVAL_HOURS = int(os.environ.get('CLEANUP_INTERVAL_HOURS', 1))
 
     # Legacy ASSETS config - now used only as fallback/migration
     # New assets are created dynamically with expiration dates
-    ASSETS = {
-        'XQR': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.05},
-        'ZLN': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.06},
-        'FWX': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.02},
-        'KVT': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.03},
-        'PGH': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.08},
-        'MWZ': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.025},
-        'DQB': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.035},
-        'LNC': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.04},
-        'EPS': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.10},
-        'ACT': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.001},
-        'ORD': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.2},
-    }
+    # ASSETS = {
+    #     'XQR': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.05},
+    #     'ZLN': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.06},
+    #     'FWX': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.02},
+    #     'KVT': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.03},
+    #     'PGH': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.08},
+    #     'MWZ': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.025},
+    #     'DQB': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.035},
+    #     'LNC': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.04},
+    #     'EPS': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.10},
+    #     'ACT': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.001},
+    #     'ORD': {'price': INITIAL_ASSET_PRICE, 'volatility': 0.2},
+    # }
+    ASSETS = None  # Disabled - assets are created dynamically
     
     # Chart settings
     MAX_HISTORY_POINTS = 100
     PRICE_UPDATE_INTERVAL = 1  # seconds
+
+    EXCLUDED_SYMBOLS = str(os.environ.get('EXCLUDED_SYMBOLS', '')).split(' ')
 
 class DevelopmentConfig(Config):
     """Development configuration."""

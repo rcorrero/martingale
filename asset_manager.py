@@ -223,7 +223,8 @@ class AssetManager:
             asset = Asset.create_new_asset(
                 initial_price=self.initial_asset_price,
                 volatility=None,  # Random
-                minutes_to_expiry=None  # Random 5-480 minutes (5 min to 8 hours)
+                minutes_to_expiry=None,  # Random
+                exclude_symbols=self.config.get('EXCLUDED_SYMBOLS', None) 
             )
             db.session.add(asset)
             new_assets.append(asset)

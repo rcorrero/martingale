@@ -4,7 +4,7 @@ Provides fallback functionality when the price service is unavailable.
 """
 import time
 import requests
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 import logging
 
 logger = logging.getLogger(__name__)
@@ -147,21 +147,22 @@ class PriceServiceClient:
 class FallbackPriceService:
     """Fallback price service that generates prices locally if the API is unavailable."""
     
-    def __init__(self, assets_config: Dict[str, Dict[str, Any]]):
+    def __init__(self, assets_config: Optional[Union[Dict[str, Dict[str, Any]], None]] = None):
         """Initialize with asset configuration.
         
         Args:
             assets_config: Configuration dictionary for assets
         """
         self.assets = {}
-        for symbol, config in assets_config.items():
-            self.assets[symbol] = {
-                'price': config['price'],
-                'volatility': config.get('volatility', 0.02),
-                'drift': config.get('drift', 0.0),  # Default to 0.0 for backward compatibility
-                'history': [],
-                'last_update': None
-            }
+        if assets_config:
+            for symbol, config in assets_config.items():
+                self.assets[symbol] = {
+                    'price': config['price'],
+                    'volatility': config.get('volatility', 0.02),
+                    'drift': config.get('drift', 0.0),  # Default to 0.0 for backward compatibility
+                    'history': [],
+                    'last_update': None
+                }
     
     def add_asset(self, symbol: str, initial_price: float, volatility: float = 0.02, drift: float = 0.0):
         """Add a new asset to the fallback service.
@@ -276,7 +277,7 @@ class FallbackPriceService:
 class HybridPriceService:
     """Hybrid service that uses API when available, falls back to local generation."""
     
-    def __init__(self, assets_config: Dict[str, Dict[str, Any]], api_url: Optional[str] = "http://localhost:5001"):
+    def __init__(self, assets_config: Optional[Union[Dict[str, Dict[str, Any]],None]] = None, api_url: Optional[str] = "http://localhost:5001"):
         """Initialize hybrid service.
         
         Args:
