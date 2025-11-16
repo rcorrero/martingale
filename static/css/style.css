@@ -2330,21 +2330,21 @@ body.info-page {
     top: 0;
     left: 0;
     right: 0;
-    bottom: 80px; /* Leave space for bottom controls */
+    bottom: 120px; /* Leave space for bottom controls */
     overflow: hidden;
 }
 
 /* Individual asset card - fills entire viewport */
 .mobile-asset-card {
     position: absolute;
-    top: 120px; /* Start below top bar (60px) and search container (~60px) */
+    top: 136px; /* Start below top bar (60px) and search container (~60px) */
     left: 0;
     right: 0;
     bottom: 0;
     background: var(--terminal-bg);
     display: flex;
     flex-direction: column;
-    padding: 20px;
+    padding: 2px;
     transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     will-change: transform;
 }
@@ -2363,12 +2363,12 @@ body.info-page {
 
 /* Asset info header within card */
 .mobile-asset-header {
-    padding: 20px;
+    padding: 2px;
     text-align: center;
     background: rgba(7, 8, 10, 0.6);
     border-radius: 16px;
     border: 1px solid var(--terminal-border);
-    margin-bottom: 15px;
+    margin-bottom: 2px;
 }
 
 .mobile-asset-symbol {

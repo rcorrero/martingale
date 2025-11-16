@@ -264,7 +264,9 @@ class AssetManager:
         
         stats = {
             'active_assets': active_count,
-            'created_assets': 0
+            'created_assets': 0,
+            'active_symbols': [a.symbol for a in active_assets],
+            'created_symbols': []
         }
         
         if active_count < self.min_active_assets:
@@ -272,6 +274,7 @@ class AssetManager:
             logger.info(f"Creating {needed} new assets to maintain pool of {self.min_active_assets}")
             new_assets = self.create_new_assets(count=needed)
             stats['created_assets'] = len(new_assets)
+            stats['created_symbols'] = [a.symbol for a in new_assets]
         
         return stats
     

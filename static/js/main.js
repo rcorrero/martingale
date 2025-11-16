@@ -1026,7 +1026,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const {
             id = null,
             autoClose = true,
-            autoCloseMs = 10000,
+            autoCloseMs = 3000,
             replaceExisting = true,
             onClose = null
         } = options;
@@ -3190,10 +3190,10 @@ document.addEventListener('DOMContentLoaded', () => {
         touchStartY = e.touches[0].clientY;
         isSwiping = false;
         
-        // Keep window scroll position at 1px to maintain Safari auto-hide trigger
-        if (window.scrollY !== 1) {
-            window.scrollTo(0, 1);
-        }
+        // // Keep window scroll position at 1px to maintain Safari auto-hide trigger
+        // if (window.scrollY !== 1) {
+        //     window.scrollTo(0, 1);
+        // }
     }
 
     function handleMobileTouchMove(e) {
@@ -3208,10 +3208,10 @@ document.addEventListener('DOMContentLoaded', () => {
             isSwiping = true;
         }
         
-        // Maintain window scroll position at 1px
-        if (window.scrollY !== 1) {
-            window.scrollTo(0, 1);
-        }
+        // // Maintain window scroll position at 1px
+        // if (window.scrollY !== 1) {
+        //     window.scrollTo(0, 1);
+        // }
     }
 
     function handleMobileTouchEnd(e) {
@@ -3352,7 +3352,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="mobile-asset-symbol">${asset.symbol}</div>
                 <div class="mobile-asset-price" id="mobile-price-${asset.symbol}">$${asset.price ? asset.price.toFixed(2) : '0.00'}</div>
                 ${positionHtml}
-                <div class="mobile-asset-expiry"><span class="mobile-expiry-label">Expiry:</span> <span id="mobile-expiry-${asset.symbol}">${expiryText}</span></div>
+                <div class="mobile-asset-expiry"><span class="mobile-expiry-label">Expires In:</span> <span id="mobile-expiry-${asset.symbol}">${expiryText}</span></div>
             </div>
             <div class="mobile-asset-chart">
                 <canvas id="mobile-chart-${asset.symbol}"></canvas>
@@ -3482,7 +3482,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     card.style.transition = '';
                 });
             });
-        }
+        }       
 
         // Update sell button state
         if (mobileSellBtn && mobileAssets[currentMobileAssetIndex]) {
@@ -3491,6 +3491,17 @@ document.addEventListener('DOMContentLoaded', () => {
             mobileSellBtn.disabled = !hasPosition;
             mobileSellBtn.style.opacity = hasPosition ? '1' : '0.5';
         }
+
+        // Hide tooltips for all mobile charts (including the active one)
+        mobileCharts.forEach(chartObj => {
+            if (chartObj && chartObj.chart) {
+                chartObj.chart.setActiveElements([]);
+                if (chartObj.chart.tooltip) {
+                    chartObj.chart.tooltip.setActiveElements([], {x: 0, y: 0});
+                }
+                chartObj.chart.update('none');
+            }
+        });
     }
 
     function createMobileAssetChart(canvas, asset) {
@@ -4121,7 +4132,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Confirm sell all
-        if (!confirm(`Are you sure you want to sell all ${positions.length} positions?`)) {
+        if (!confirm(`Are you sure you want to sell all ${positions.length} position(s)?`)) {
             return;
         }
         

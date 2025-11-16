@@ -1563,16 +1563,25 @@ def update_prices():
                 symbols = [asset.symbol for asset in worthless_assets]
                 symbols_str = ', '.join(symbols)
                 
-                # Notify clients about the settlement
+                # # Notify clients about the settlement
+                # socketio.emit('assets_updated', {
+                #     'message': f"{len(worthless_assets)} asset(s) auto-settled ({symbols_str})",
+                #     'stats': {
+                #         'expired_assets': 0,
+                #         'worthless_assets': len(worthless_assets),
+                #         'total_settled': len(worthless_assets),
+                #         'settlement_stats': settlement_stats
+                #     }
+                # })
                 socketio.emit('assets_updated', {
-                    'message': f"{len(worthless_assets)} asset(s) auto-settled ({symbols_str})",
+                    'message': f"{symbols_str} auto-settled",
                     'stats': {
                         'expired_assets': 0,
                         'worthless_assets': len(worthless_assets),
                         'total_settled': len(worthless_assets),
                         'settlement_stats': settlement_stats
                     }
-                })
+                })                
                 
                 # Signal clients to refresh portfolio
                 socketio.emit('portfolio_refresh_needed', {})
@@ -1618,21 +1627,40 @@ def expiration_check_thread():
                     
                     # Build symbol list for notification
                     symbols = stats.get('expired_symbols', [])
+                    # if symbols:
                     symbols_str = ', '.join(symbols) if symbols else ''
                     
                     # Give database a moment to ensure all commits are complete
                     time.sleep(0.5)
                     
                     # Notify all connected clients about settlements
+                    # socketio.emit('assets_updated', {
+                    #     'message': f"{stats['expired_assets']} asset(s) expired and settled ({symbols_str})",
+                    #     'stats': stats
+                    # })
                     socketio.emit('assets_updated', {
-                        'message': f"{stats['expired_assets']} asset(s) expired and settled ({symbols_str})",
+                        'message': f"{symbols_str} expired and settled",
                         'stats': stats
-                    })
-                    
+                    })                    
+                        
                     # Signal all clients to refresh their portfolio data
                     socketio.emit('portfolio_refresh_needed', {})
                     
                     logger.info("Emitted settlement notifications to all clients")
+
+                    # time.sleep(0.5)
+
+                    created_symbols = stats['maintenance_stats'].get('created_symbols', None)
+                    if created_symbols:
+                        created_symbols_str = ', '.join(created_symbols)
+
+                        # time.sleep(0.1)
+
+                        socketio.emit('assets_updated', {
+                            'message': f"New asset(s) created: {created_symbols_str}",
+                            'stats': stats
+                        })
+                        logger.info("Emitted new asset creation notifications to all clients")
                 
         except Exception as e:
             logger.error(f"Error in expiration check thread: {e}")

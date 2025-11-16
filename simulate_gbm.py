@@ -3,9 +3,11 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 from scipy.stats import multivariate_normal
 
+np.random.seed(8675309)
+
 # Simulation parameters
-n_realizations = 256
-n_steps = 10 * 60 
+n_realizations = 512
+n_steps = 15 * 60 
 dt = 1.0  # time step (seconds)
 # initial_price = 100.0
 
@@ -87,7 +89,8 @@ else:
     ax.set_title('Negative Drift (μ < 0)\nNo series')
 ax.set_xlabel('Time Step')
 ax.set_ylabel('Price')
-ax.grid(True)
+ax.set_yscale('log')
+ax.grid(True, which='both', axis='y')
 sm_neg = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 sm_neg.set_array([])
 fig.colorbar(sm_neg, label='Drift (μ)', ax=ax)
@@ -105,7 +108,8 @@ if np.any(pos_idx):
 else:
     ax.set_title('Positive Drift (μ ≥ 0)\nNo series')
 ax.set_xlabel('Time Step')
-ax.grid(True)
+ax.set_yscale('log')
+ax.grid(True, which='both', axis='y')
 sm_pos = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 sm_pos.set_array([])
 fig.colorbar(sm_pos, label='Drift (μ)', ax=ax)
