@@ -2053,6 +2053,33 @@ body.info-page {
     min-height: 72px;
 }
 
+/* Highlight overview cards for assets where the user holds a position */
+.overview-card.overview-has-position {
+    border: 2px solid var(--terminal-accent); /* default accent border when P&L unknown */
+    box-shadow: 0 8px 18px rgba(59, 130, 246, 0.12);
+    transform: translateY(-2px);
+}
+
+.overview-card.overview-has-position .asset-overview-btn {
+    box-shadow: 0 6px 14px rgba(59, 130, 246, 0.12);
+}
+
+/* Profit / Loss specific highlights */
+.overview-card.overview-position-profit {
+    border-color: #7dda58; /* bright green */
+    box-shadow: 0 10px 26px rgba(34, 197, 94, 0.12);
+}
+.overview-card.overview-position-profit .asset-overview-btn {
+    box-shadow: 0 8px 18px rgba(34, 197, 94, 0.12);
+}
+.overview-card.overview-position-loss {
+    border-color: #f85149; /* bright red */
+    box-shadow: 0 10px 26px rgba(248, 81, 73, 0.12);
+}
+.overview-card.overview-position-loss .asset-overview-btn {
+    box-shadow: 0 8px 18px rgba(248, 81, 73, 0.12);
+}
+
 .overview-card .overview-symbol {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 700;

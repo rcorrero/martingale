@@ -3318,6 +3318,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     const card = document.createElement('div');
                     card.className = 'overview-card';
 
+                    // If the user holds a position in this asset, add a highlight class
+                    try {
+                        const qty = (userPortfolio && userPortfolio.holdings && Number(userPortfolio.holdings[symbol])) || 0;
+                        if (qty > 0) {
+                            // Compute P&L if available
+                            let pnl = null;
+                            if (userPortfolio.position_pnl && userPortfolio.position_pnl[symbol]) {
+                                pnl = Number(userPortfolio.position_pnl[symbol].unrealized_pnl ?? userPortfolio.position_pnl[symbol].total_pnl ?? null);
+                            }
+                            // Fallback: compute from VWAP if available and priceVal known
+                            if (pnl === null) {
+                                const vwap = calculateVWAP(symbol);
+                                const currentPrice = Number(priceVal) || 0;
+                                if (vwap && Number.isFinite(currentPrice)) {
+                                    pnl = qty * (currentPrice - vwap);
+                                }
+                            }
+
+                            card.classList.add('overview-has-position');
+                            // Remove any existing profit/loss classes
+                            card.classList.remove('overview-position-profit', 'overview-position-loss');
+                            if (pnl !== null && Number.isFinite(pnl)) {
+                                if (pnl > 0) card.classList.add('overview-position-profit');
+                                else if (pnl < 0) card.classList.add('overview-position-loss');
+                            }
+                        }
+                    } catch (err) {
+                        // ignore
+                    }
+
                     const btn = document.createElement('button');
                     btn.className = 'symbol-badge asset-overview-btn';
                     btn.style.backgroundColor = color;
@@ -3460,6 +3490,33 @@ document.addEventListener('DOMContentLoaded', () => {
                         `;
                     }
                     // (header-stats updating removed)
+                    // Update highlight state for position (if holdings changed)
+                    try {
+                        const qtyNow = (userPortfolio && userPortfolio.holdings && Number(userPortfolio.holdings[symbol])) || 0;
+                        if (qtyNow > 0) {
+                            let pnlNow = null;
+                            if (userPortfolio.position_pnl && userPortfolio.position_pnl[symbol]) {
+                                pnlNow = Number(userPortfolio.position_pnl[symbol].unrealized_pnl ?? userPortfolio.position_pnl[symbol].total_pnl ?? null);
+                            }
+                            if (pnlNow === null) {
+                                const vwapNow = calculateVWAP(symbol);
+                                const currentPriceNow = Number(price) || 0;
+                                if (vwapNow && Number.isFinite(currentPriceNow)) {
+                                    pnlNow = qtyNow * (currentPriceNow - vwapNow);
+                                }
+                            }
+                            card.classList.add('overview-has-position');
+                            card.classList.remove('overview-position-profit', 'overview-position-loss');
+                            if (pnlNow !== null && Number.isFinite(pnlNow)) {
+                                if (pnlNow > 0) card.classList.add('overview-position-profit');
+                                else if (pnlNow < 0) card.classList.add('overview-position-loss');
+                            }
+                        } else {
+                            card.classList.remove('overview-has-position', 'overview-position-profit', 'overview-position-loss');
+                        }
+                    } catch (err) {
+                        // ignore
+                    }
                 }
             }
         }
