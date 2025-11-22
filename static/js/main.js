@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const assetInput = document.getElementById('asset-input');
     const assetSuggestions = document.getElementById('asset-suggestions');
     const assetSearchInput = document.getElementById('asset-search');
+    const mobileAssetSearchInput = document.getElementById('mobile-asset-search');
     const cashBalance = document.getElementById('cash-balance');
     const holdingsList = document.getElementById('holdings-list');
     const tradeForm = document.getElementById('trade-form');
@@ -167,6 +168,33 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         localTimeEl.textContent = localTimeString;
     }
+
+    // Clear mobile asset search on load/restore to avoid preserved user text
+    function clearMobileAssetSearch() {
+        if (!mobileAssetSearchInput) return;
+        try {
+            mobileAssetSearchInput.value = '';
+            // turn off autocomplete to reduce browser autofill restoring
+            mobileAssetSearchInput.setAttribute('autocomplete', 'off');
+        } catch (err) {
+            // ignore
+        }
+    }
+
+    // Clear on initial load
+    clearMobileAssetSearch();
+
+    // Some browsers restore pages from bfcache — clear when pageshow indicates a persisted page
+    window.addEventListener('pageshow', (e) => {
+        if (e.persisted) {
+            clearMobileAssetSearch();
+        }
+    });
+
+    // Also try to clear before unload to avoid saving state in some browsers
+    window.addEventListener('beforeunload', () => {
+        if (mobileAssetSearchInput) mobileAssetSearchInput.value = '';
+    });
     
     function initializeTimeDisplay() {
         // Update time immediately
@@ -2324,6 +2352,30 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update mobile view
         if (isMobileView()) {
             updateMobileAccountInfo();
+            // If the overview panel is visible, update it first using the previous-price
+            // snapshot so we compare against the authoritative previous price and avoid
+            // overwriting that value before the comparison (this prevents a flash).
+            if (mobileOverviewVisible) {
+                try {
+                    Object.entries(assets).forEach(([symbol, data]) => {
+                        updateMobileOverviewSingle(symbol, { time: Date.now(), price: data.price });
+                    });
+                } catch (err) {
+                    // ignore
+                }
+            }
+            // Update header μ/σ stats for all assets in mobile view so header reflects
+            // live statistics even when the overview panel is closed.
+            try {
+                Object.keys(assets).forEach(symbol => {
+                    if (typeof updateMobileHeaderStats === 'function') {
+                        updateMobileHeaderStats(symbol);
+                    }
+                });
+            } catch (err) {
+                // ignore
+            }
+            // Now update the mobile cards and authoritative previous-price store
             updateMobilePrices(assets);
             updateMobileExpiry(Object.values(assets), true); // Force update with fresh server data
             updateMobilePnL(); // Update P&L displays on asset cards
@@ -2467,6 +2519,10 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('price_chart_update', (data) => {
         const { symbol, time, price } = data;
         updateChartData(symbol, {x: time, y: price});
+        // NOTE: Do not update the mobile overview here — chart updates can arrive
+        // independently and cause race conditions with the main `price_update`
+        // handler which manages the authoritative previous-price store. The
+        // overview is updated from the primary `price_update` handler instead.
     });
 
     // Initial load of assets for trade form
@@ -3054,6 +3110,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let wheelDeltaY = 0;
     let mobilePreviousPrices = {}; // Track price changes for color coding
     let mobileExpiryTimestamps = {}; // Track expiry timestamps for real-time countdown
+    let assetHistories = {}; // Cached histories for overview stats
+    let mobileOverviewVisible = false; // Is overview panel visible
 
     const mobileCarousel = document.getElementById('mobile-carousel');
     const mobilePortfolioValueEl = document.getElementById('mobile-portfolio-value');
@@ -3102,6 +3160,18 @@ document.addEventListener('DOMContentLoaded', () => {
                             p.classList.remove('active');
                         }
                     });
+                }
+                // If the user left the 'assets' tab, hide the overview pane if open
+                try {
+                    const overviewPanel = document.getElementById('mobile-asset-overview');
+                    const overviewToggle = document.getElementById('mobile-overview-toggle');
+                    if (overviewPanel && overviewPanel.classList.contains('active') && pageName !== 'assets') {
+                        overviewPanel.classList.remove('active');
+                        if (overviewToggle) overviewToggle.setAttribute('aria-pressed', 'false');
+                        mobileOverviewVisible = false;
+                    }
+                } catch (err) {
+                    // ignore
                 }
             });
         });
@@ -3168,6 +3238,273 @@ document.addEventListener('DOMContentLoaded', () => {
                     updateMobileAssetDisplay();
                 }
             });
+            // Hide overview when the user begins typing in search
+            mobileAssetSearch.addEventListener('input', () => {
+                const overviewPanel = document.getElementById('mobile-asset-overview');
+                const toggle = document.getElementById('mobile-overview-toggle');
+                if (overviewPanel && overviewPanel.classList.contains('active')) {
+                    overviewPanel.classList.remove('active');
+                    if (toggle) toggle.setAttribute('aria-pressed', 'false');
+                    mobileOverviewVisible = false;
+                }
+            });
+        }
+
+        // Setup overview toggle (button inserted in template)
+        const mobileOverviewToggle = document.getElementById('mobile-overview-toggle');
+        const mobileOverviewPanel = document.getElementById('mobile-asset-overview');
+
+        function computeReturnsStats(history) {
+            // history: array of {time, price} sorted ascending
+            if (!Array.isArray(history) || history.length < 2) {
+                return { mean: 0, std: 0, count: 0 };
+            }
+            const returns = [];
+            for (let i = 1; i < history.length; i++) {
+                const p0 = Number(history[i - 1].price ?? history[i - 1].y ?? history[i - 1].price);
+                const p1 = Number(history[i].price ?? history[i].y ?? history[i].price);
+                if (!Number.isFinite(p0) || !Number.isFinite(p1) || p0 === 0) continue;
+                const r = (p1 / p0 - 1) * 100.0; // percent returns
+                returns.push(r);
+            }
+
+            const n = returns.length;
+            if (n === 0) return { mean: 0, std: 0, count: 0 };
+
+            const mean = returns.reduce((s, v) => s + v, 0) / n;
+            const variance = n > 1 ? returns.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / (n - 1) : 0;
+            const std = Math.sqrt(variance);
+            return { mean, std, count: n };
+        }
+
+        async function ensureHistoriesLoaded() {
+            if (Object.keys(assetHistories).length > 0) return;
+            try {
+                const resp = await fetch('/api/assets/history');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                Object.entries(data).forEach(([symbol, history]) => {
+                    // store as array of {time, price}
+                    const normalized = (history || []).map(p => ({ time: Number(p.time), price: Number(p.price) })).filter(p => Number.isFinite(p.time) && Number.isFinite(p.price));
+                    assetHistories[symbol] = normalized.slice(-200); // keep last 200 points
+                });
+            } catch (err) {
+                // ignore
+            }
+        }
+
+        function renderMobileAssetOverview() {
+            const grid = document.getElementById('mobile-overview-grid');
+            if (!grid) return;
+            grid.innerHTML = '';
+
+            // Use latestAssetsSnapshot if available, otherwise fetch /api/assets
+            const assetsPromise = latestAssetsSnapshot ? Promise.resolve(latestAssetsSnapshot) : fetch('/api/assets').then(r => r.json()).catch(() => ({}));
+
+            assetsPromise.then(async (assetsData) => {
+                // Ensure histories loaded (may be async)
+                await ensureHistoriesLoaded();
+
+                const symbols = Object.keys(assetsData).sort();
+                symbols.forEach(symbol => {
+                    const a = assetsData[symbol] || {};
+                    const color = getInstrumentColor(symbol, a);
+                    const priceVal = a.price != null ? Number(a.price) : (mobilePreviousPrices[symbol] ?? latestAssetPrices[symbol] ?? 0);
+
+                    // Prepare history for stats
+                    const history = assetHistories[symbol] || [];
+                    const stats = computeReturnsStats(history);
+
+                    const card = document.createElement('div');
+                    card.className = 'overview-card';
+
+                    const btn = document.createElement('button');
+                    btn.className = 'symbol-badge asset-overview-btn';
+                    btn.style.backgroundColor = color;
+                    btn.textContent = symbol;
+                    btn.onclick = () => {
+                        // emulate mobile symbol badge click behavior
+                        // Hide overview after selecting an asset so user returns to the main mobile view
+                        const overviewPanelHide = document.getElementById('mobile-asset-overview');
+                        const overviewToggleBtn = document.getElementById('mobile-overview-toggle');
+                        if (overviewPanelHide && overviewPanelHide.classList.contains('active')) {
+                            overviewPanelHide.classList.remove('active');
+                            overviewPanelHide.setAttribute('aria-hidden', 'true');
+                        }
+                        if (overviewToggleBtn) {
+                            overviewToggleBtn.setAttribute('aria-pressed', 'false');
+                        }
+                        mobileOverviewVisible = false;
+                        handleMobileSymbolBadgeClick(symbol);
+                    };
+
+                    const priceEl = document.createElement('div');
+                    priceEl.className = 'overview-price';
+                    priceEl.textContent = priceVal ? formatCurrencyLocale(priceVal) : '--';
+                    // store the displayed previous price on the card so we can compare against it
+                    // This avoids race conditions where `mobilePreviousPrices` is updated earlier
+                    // by other handlers in the same socket event.
+                    card.dataset.prevPrice = Number(priceVal) || 0;
+                    // Apply coloring via CSS classes so the state persists reliably
+                    try {
+                        const prevNum = Number(card.dataset.prevPrice);
+                        const prev = Number.isFinite(prevNum) && prevNum !== 0 ? prevNum : mobilePreviousPrices[symbol];
+                        priceEl.classList.remove('price-up', 'price-down');
+                        if (prev !== undefined && Number.isFinite(prev)) {
+                            if (priceVal > prev) {
+                                priceEl.classList.add('price-up');
+                            } else if (priceVal < prev) {
+                                priceEl.classList.add('price-down');
+                            }
+                        }
+                        // clear any inline color so CSS classes determine appearance
+                        priceEl.style.color = '';
+                        // store previous price on the card for later comparisons
+                        card.dataset.prevPrice = Number(priceVal) || 0;
+                    } catch (err) {
+                        // ignore
+                    }
+
+                    // (header stats population removed)
+
+                    const statsEl = document.createElement('div');
+                    statsEl.className = 'overview-stats';
+                    const muClass = (Number(stats.mean) > 0) ? 'mu-positive' : 'mu-negative';
+                    // sigma magnitude classification: <3% = low (green), 3-6% = mid (yellow), >=6% = high (red)
+                    const sigmaVal = Number(stats.std);
+                    let sigmaClass = 'sigma-low';
+                    if (!Number.isFinite(sigmaVal)) {
+                        sigmaClass = '';
+                    } else if (Math.abs(sigmaVal) < 3) {
+                        sigmaClass = 'sigma-low';
+                    } else if (Math.abs(sigmaVal) < 6) {
+                        sigmaClass = 'sigma-mid';
+                    } else {
+                        sigmaClass = 'sigma-high';
+                    }
+                    statsEl.innerHTML = `
+                        <div class="overview-stat-row"><span class="overview-stat-label">μ</span><span class="overview-stat-value overview-mu ${muClass}">${formatNumber(stats.mean, 2)}%</span></div>
+                        <div class="overview-stat-row"><span class="overview-stat-label">σ</span><span class="overview-stat-value overview-sigma ${sigmaClass}">${formatNumber(stats.std, 2)}%</span></div>
+                    `;
+
+                    card.appendChild(btn);
+                    card.appendChild(priceEl);
+                    card.appendChild(statsEl);
+
+                    grid.appendChild(card);
+                });
+            });
+        }
+
+        function updateMobileOverviewSingle(symbol, newPricePoint) {
+            // Update cached history
+            if (!assetHistories[symbol]) assetHistories[symbol] = [];
+            const arr = assetHistories[symbol];
+            // Normalize point
+            const time = Number(newPricePoint?.time ?? Date.now());
+            const price = Number(newPricePoint?.price ?? newPricePoint?.y ?? newPricePoint?.price ?? newPricePoint);
+            if (Number.isFinite(time) && Number.isFinite(price)) {
+                arr.push({ time, price });
+                if (arr.length > 200) arr.shift();
+            }
+
+            // Recompute stats and update DOM for that symbol
+            const grid = document.getElementById('mobile-overview-grid');
+            if (!grid) return;
+            const cards = Array.from(grid.querySelectorAll('.overview-card'));
+            for (const card of cards) {
+                const btn = card.querySelector('.asset-overview-btn');
+                if (btn && btn.textContent === symbol) {
+                    const priceEl = card.querySelector('.overview-price');
+                    const statsEl = card.querySelector('.overview-stats');
+                    if (priceEl) priceEl.textContent = formatCurrencyLocale(price);
+                    // Apply coloring via CSS classes so the state persists reliably
+                    try {
+                        const cardPrevRaw = card.dataset.prevPrice;
+                        const cardPrev = Number.isFinite(Number(cardPrevRaw)) ? Number(cardPrevRaw) : undefined;
+                        const prev = (cardPrev !== undefined && cardPrev !== 0) ? cardPrev : mobilePreviousPrices[symbol];
+                        priceEl.classList.remove('price-up', 'price-down');
+                        if (prev !== undefined && Number.isFinite(prev)) {
+                            if (price > prev) {
+                                priceEl.classList.add('price-up');
+                            } else if (price < prev) {
+                                priceEl.classList.add('price-down');
+                            }
+                        }
+                        // clear any inline color so CSS classes determine appearance
+                        priceEl.style.color = '';
+                        // update the card's prevPrice to the new displayed price
+                        card.dataset.prevPrice = price;
+                    } catch (err) {
+                        // ignore
+                    }
+                    // Also update the global mobilePreviousPrices so other parts of the UI stay consistent
+                    mobilePreviousPrices[symbol] = price;
+                    const stats = computeReturnsStats(arr);
+                    if (statsEl) {
+                        const muClass = (Number(stats.mean) > 0) ? 'mu-positive' : 'mu-negative';
+                        const sigmaVal = Number(stats.std);
+                        let sigmaClass = 'sigma-low';
+                        if (!Number.isFinite(sigmaVal)) {
+                            sigmaClass = '';
+                        } else if (Math.abs(sigmaVal) < 3) {
+                            sigmaClass = 'sigma-low';
+                        } else if (Math.abs(sigmaVal) < 6) {
+                            sigmaClass = 'sigma-mid';
+                        } else {
+                            sigmaClass = 'sigma-high';
+                        }
+                        statsEl.innerHTML = `
+                            <div class="overview-stat-row"><span class="overview-stat-label">μ</span><span class="overview-stat-value overview-mu ${muClass}">${formatNumber(stats.mean, 2)}%</span></div>
+                            <div class="overview-stat-row"><span class="overview-stat-label">σ</span><span class="overview-stat-value overview-sigma ${sigmaClass}">${formatNumber(stats.std, 2)}%</span></div>
+                        `;
+                    }
+                    // (header-stats updating removed)
+                }
+            }
+        }
+
+        // Update header stats helper: computes μ/σ from cached history and updates header snippet
+        function updateMobileHeaderStats(symbol) {
+            try {
+                const headerStatsEl = document.getElementById(`mobile-stats-${symbol}`);
+                if (!headerStatsEl) return;
+                const history = assetHistories[symbol] || [];
+                const stats = computeReturnsStats(history);
+                const mu = Number(stats.mean || 0);
+                const sigma = Number(stats.std || 0);
+                const muClass = mu > 0 ? 'mu-positive' : 'mu-negative';
+                let sigmaClass = '';
+                if (Number.isFinite(sigma)) {
+                    if (Math.abs(sigma) < 3) sigmaClass = 'sigma-low';
+                    else if (Math.abs(sigma) < 6) sigmaClass = 'sigma-mid';
+                    else sigmaClass = 'sigma-high';
+                }
+                headerStatsEl.innerHTML = `<span class="header-stat"><span class="header-stat-label">μ</span> <span class="header-stat-value overview-mu ${muClass}">${formatNumber(mu, 2)}%</span></span> <span class="header-stat-sep">|</span> <span class="header-stat"><span class="header-stat-label">σ</span> <span class="header-stat-value overview-sigma ${sigmaClass}">${formatNumber(sigma, 2)}%</span></span>`;
+            } catch (err) {
+                // ignore
+            }
+        }
+
+        if (mobileOverviewToggle && mobileOverviewPanel) {
+            mobileOverviewToggle.addEventListener('click', (e) => {
+                mobileOverviewVisible = !mobileOverviewVisible;
+                mobileOverviewPanel.classList.toggle('active', mobileOverviewVisible);
+                mobileOverviewPanel.setAttribute('aria-hidden', String(!mobileOverviewVisible));
+                mobileOverviewToggle.setAttribute('aria-pressed', String(!!mobileOverviewVisible));
+                if (mobileOverviewVisible) {
+                    // Render overview
+                    renderMobileAssetOverview();
+                }
+            });
+        }
+        // Expose a couple helpers to the outer scope so real-time handlers can update the overview
+        try {
+            window.updateMobileOverviewSingle = updateMobileOverviewSingle;
+            window.renderMobileAssetOverview = renderMobileAssetOverview;
+            window.ensureAssetHistoriesLoaded = ensureHistoriesLoaded;
+        } catch (err) {
+            // ignore if window not writable in some contexts
         }
 
         // Initialize mobile data
@@ -3352,7 +3689,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="mobile-asset-symbol">${asset.symbol}</div>
                 <div class="mobile-asset-price" id="mobile-price-${asset.symbol}">$${asset.price ? asset.price.toFixed(2) : '0.00'}</div>
                 ${positionHtml}
-                <div class="mobile-asset-expiry"><span class="mobile-expiry-label">Expires In:</span> <span id="mobile-expiry-${asset.symbol}">${expiryText}</span></div>
+                <div class="mobile-asset-expiry">
+                    <span class="mobile-expiry-label">Expires In:</span>
+                    <span id="mobile-expiry-${asset.symbol}">${expiryText}</span>
+                    <span class="mobile-header-stats" id="mobile-stats-${asset.symbol}">
+                        <!-- μ and σ will be filled in if history available -->
+                    </span>
+                </div>
             </div>
             <div class="mobile-asset-chart">
                 <canvas id="mobile-chart-${asset.symbol}"></canvas>

@@ -1989,6 +1989,205 @@ body.info-page {
     font-size: 13px;
 }
 
+/* Mobile Asset Overview Panel */
+.mobile-asset-search-container {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.mobile-overview-toggle {
+    background: var(--terminal-surface-light);
+    color: var(--terminal-text);
+    border: 1px solid var(--terminal-border);
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+}
+
+.mobile-asset-overview {
+    display: none; /* hidden by default */
+    /* place overview in the same viewport area as asset cards so it doesn't overlap header/search */
+    position: fixed;
+    top: 136px; /* align with .mobile-asset-card top */
+    left: 0;
+    right: 0;
+    bottom: 120px; /* leave room for bottom controls */
+    width: 100%;
+    margin: 0;
+    z-index: 1000; /* sit between top/bottom chrome and card area */
+}
+
+.mobile-asset-overview.active {
+    display: block;
+}
+
+.mobile-asset-overview-inner {
+    background: var(--terminal-surface-light);
+    border: 1px solid var(--terminal-border);
+    border-radius: 10px;
+    padding: 10px;
+    height: 100%;
+    overflow-y: auto;
+    box-shadow: 0 16px 32px rgba(0,0,0,0.6);
+}
+
+.overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 10px;
+    align-items: start;
+}
+
+.overview-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+    padding: 8px;
+    border-radius: 8px;
+    background: var(--terminal-bg);
+    border: 1px solid var(--terminal-border-subtle);
+    min-height: 72px;
+}
+
+.overview-card .overview-symbol {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.overview-card .overview-price {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--terminal-accent);
+}
+
+/* Persistent price color states for overview cards */
+.overview-card .overview-price.price-up {
+    color: #7dda58 !important; /* bright green */
+}
+.overview-card .overview-price.price-down {
+    color: #f85149 !important; /* bright red */
+}
+
+.overview-card .overview-stats {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--terminal-text-secondary);
+    text-align: center;
+}
+
+/* Mean (mu) sign styling */
+.overview-stats .overview-mu.mu-positive {
+    color: #7dda58; /* green */
+    font-weight: 700;
+}
+.overview-stats .overview-mu.mu-negative {
+    color: #f85149; /* red */
+    font-weight: 700;
+}
+
+/* Global mu color rules so header and overview use same classes */
+.overview-mu.mu-positive,
+.mobile-header-stats .overview-mu.mu-positive,
+.header-stat-value.overview-mu.mu-positive {
+    color: #7dda58;
+    font-weight: 700;
+}
+.overview-mu.mu-negative,
+.mobile-header-stats .overview-mu.mu-negative,
+.header-stat-value.overview-mu.mu-negative {
+    color: #f85149;
+    font-weight: 700;
+}
+
+/* Keep sigma symbol and numeric value on the same line */
+.overview-stats .overview-sigma {
+    white-space: nowrap;
+    display: inline-block;
+}
+
+/* Two-line aligned layout for μ and σ */
+.overview-stat-row {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    align-items: center;
+}
+.overview-stat-label {
+    width: 18px; /* fixed label width so values align */
+    text-align: right;
+    color: var(--terminal-text-secondary);
+    font-weight: 700;
+}
+.overview-stat-value {
+    min-width: 48px;
+    text-align: left;
+    display: inline-block;
+}
+
+/* Sigma magnitude coloring */
+.overview-sigma.sigma-low {
+    color: #7dda58; /* green */
+    font-weight: 700;
+}
+.overview-sigma.sigma-mid {
+    color: #ffb020; /* yellow/orange */
+    font-weight: 700;
+}
+.overview-sigma.sigma-high {
+    color: #f85149; /* red */
+    font-weight: 700;
+}
+
+/* Mobile header stats inline next to expiry */
+.mobile-asset-expiry {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.mobile-header-stats {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--terminal-text-secondary);
+}
+.mobile-header-stats .header-stat-label {
+    color: var(--terminal-text-secondary);
+    font-weight: 700;
+    margin-right: 4px;
+}
+.mobile-header-stats .header-stat-value {
+    min-width: 44px;
+    display: inline-block;
+    text-align: left;
+}
+.mobile-header-stats .header-stat-sep {
+    color: var(--terminal-text-secondary);
+    margin: 0 6px;
+}
+
+.asset-overview-btn.symbol-badge {
+    display: inline-block;
+    padding: 6px 8px;
+    font-size: 11px;
+    border-radius: 6px;
+    min-width: 56px;
+}
+
+/* Ensure overview doesn't obscure the mobile bottom bar on small screens */
+@media (max-width: 480px) {
+    .mobile-asset-overview-inner {
+        max-height: calc(100vh - 220px);
+    }
+}
+
 .auth-form {
     text-align: left;
 }
@@ -2463,6 +2662,12 @@ body.info-page {
     font-size: 13px;
     color: var(--terminal-text-secondary);
     font-family: 'IBM Plex Sans', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center; /* horizontally center expiry content */
+    gap: 8px;
+    width: 100%;
+    text-align: center; /* ensure text inside remains centered */
 }
 
 .mobile-expiry-label {

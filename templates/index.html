@@ -43,6 +43,15 @@
             <!-- Asset search at top of carousel -->
             <div class="mobile-asset-search-container">
                 <input type="text" id="mobile-asset-search" class="mobile-asset-search" placeholder="Search Assets...">
+                <button id="mobile-overview-toggle" class="mobile-overview-toggle" aria-pressed="false" title="Asset Overview">Overview</button>
+            </div>
+            <!-- Mobile asset overview panel (hidden by default) -->
+            <div id="mobile-asset-overview" class="mobile-asset-overview" aria-hidden="true">
+                <div class="mobile-asset-overview-inner">
+                    <div class="overview-grid" id="mobile-overview-grid">
+                        <!-- Asset buttons + stats will be rendered here by JavaScript -->
+                    </div>
+                </div>
             </div>
             <!-- Asset cards will be dynamically inserted here -->
         </div>
