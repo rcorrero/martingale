@@ -2048,7 +2048,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const dataset = {
                     label: symbol,
-                    data: validHistory,
+                    // Only keep the most recent 200 points for plotting
+                    data: validHistory.slice(-200),
                     borderColor: color,
                     backgroundColor: hexToRgba(color, 0.18),
                     fill: 'origin',
@@ -2060,7 +2061,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     pointHoverBorderColor: '#0a0e1a',
                     pointHoverBorderWidth: 2,
                     stepped: false, // Ensure smooth line connections, not stepped
-                    spanGaps: false, // Don't connect across missing data points
+                    spanGaps: true, // Connect across missing data points to avoid mid-series cutouts
                     normalized: true
                 };
 
@@ -2197,7 +2198,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (needsResort) {
                             dataset.data.sort((a, b) => a.x - b.x);
                         }
-                        const excess = dataset.data.length - 100;
+                        // Keep the in-memory chart dataset bounded to 200 points
+                        const excess = dataset.data.length - 200;
                         if (excess > 0) {
                             dataset.data.splice(0, excess);
                         }
@@ -3426,8 +3428,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     try {
                         const chartObj = mobileCharts.find(c => c.symbol === symbol);
                         if (chartObj && chartObj.chart) {
-                            // Chart datasets use {x: Date, y: Number}
-                            const chartData = merged.map(p => ({ x: new Date(p.time), y: p.price }));
+                            // Chart datasets use {x: Date, y: Number}; limit to last 200
+                            const chartData = merged.slice(-200).map(p => ({ x: new Date(p.time), y: p.price }));
                             chartObj.chart.data.datasets[0].data = chartData;
                             chartObj.chart.update('none');
                         }
@@ -4452,11 +4454,12 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .then(data => {
                 if (data && data[asset.symbol]) {
-                    const history = data[asset.symbol].map(point => ({
+                    const history = (data[asset.symbol] || []).map(point => ({
                         x: new Date(point.time),
                         y: point.price
                     }));
-                    chart.data.datasets[0].data = history;
+                    // Limit plotted points to the most recent 200 to match client cache
+                    chart.data.datasets[0].data = history.slice(-200);
                     chart.update('none');
                     
                     // Update VWAP line after historical data is loaded
