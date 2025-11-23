@@ -889,7 +889,7 @@ document.addEventListener('DOMContentLoaded', () => {
             elements: {
                 line: {
                     borderWidth: 2,
-                    tension: 0.25
+                    tension: 0
                 },
                 point: {
                     radius: 0,
@@ -929,8 +929,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     borderColor: accent,
                     backgroundColor: gradient,
                     fill: 'origin',
-                    tension: 0.2,
-                    cubicInterpolationMode: 'monotone',
+                    tension: 0,
                     pointRadius: 0,
                     pointHoverRadius: 5,
                     pointHoverBorderWidth: 2,
@@ -1984,8 +1983,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     borderColor: color,
                     backgroundColor: hexToRgba(color, 0.18),
                     fill: 'origin',
-                    tension: 0.25,
-                    cubicInterpolationMode: 'monotone',
+                    tension: 0,
                     borderWidth: 2,
                     pointRadius: 0,
                     pointHoverRadius: 6,
@@ -4052,7 +4050,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     borderWidth: 2,
                     pointRadius: 0,
                     pointHoverRadius: 4,
-                    tension: 0.4,
+                    tension: 0,
                     fill: true
                 }]
             },
@@ -4274,8 +4272,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     borderColor: accent,
                     backgroundColor: gradient,
                     fill: 'origin',
-                    tension: 0.2,
-                    cubicInterpolationMode: 'monotone',
+                    tension: 0,
                     pointRadius: 0,
                     pointHoverRadius: 4,
                     pointHoverBorderWidth: 2,
