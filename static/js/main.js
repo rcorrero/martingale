@@ -3432,12 +3432,39 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="overview-stat-row"><span class="overview-stat-label">σ</span><span class="overview-stat-value overview-sigma ${sigmaClass}"><span class="overview-sigma-value">${formatNumber(stats.std, 2)}%</span><span class="overview-samples">n=${Number(stats.count || 0)}</span></span></div>
                     `;
 
+
+                    // Expiry display (realtime countdown). Use existing expiry fields when available.
+                    const expiryEl = document.createElement('div');
+                    expiryEl.className = 'overview-expiry';
+                    // Use a distinct ID for the overview expiry element to avoid
+                    // colliding with the mobile asset card expiry element (which
+                    // uses `mobile-expiry-<symbol>`). Colliding IDs prevented the
+                    // card expiry from being updated in realtime.
+                    expiryEl.id = `mobile-overview-expiry-${symbol}`;
+                    // If asset data provides an expires_in or time_to_expiry_seconds value, initialize timestamp
+                    const expirySeconds = (a && (a.expires_in !== undefined ? a.expires_in : (a.time_to_expiry_seconds !== undefined ? a.time_to_expiry_seconds : undefined)));
+                    if (expirySeconds !== undefined && Number.isFinite(Number(expirySeconds))) {
+                        mobileExpiryTimestamps[symbol] = Date.now() + (Number(expirySeconds) * 1000);
+                        expiryEl.innerHTML = formatTimeToExpiry(Math.max(0, Math.floor(Number(expirySeconds))));
+                    } else {
+                        // empty until we have data
+                        expiryEl.innerHTML = '';
+                    }
+
                     card.appendChild(btn);
                     card.appendChild(priceEl);
                     card.appendChild(statsEl);
+                    card.appendChild(expiryEl);
 
                     grid.appendChild(card);
                 });
+                // After rendering all cards, ensure stored timestamps are used to seed the countdowns
+                try {
+                    const assetsArray = symbols.map(s => Object.assign({}, assetsData[s] || {}, { symbol: s }));
+                    updateMobileExpiry(assetsArray, true);
+                } catch (err) {
+                    // ignore
+                }
             });
         }
 
@@ -3503,6 +3530,26 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div class="overview-stat-row"><span class="overview-stat-label">μ</span><span class="overview-stat-value overview-mu ${muClass}">${formatNumber(stats.mean, 2)}%</span></div>
                             <div class="overview-stat-row"><span class="overview-stat-label">σ</span><span class="overview-stat-value overview-sigma ${sigmaClass}"><span class="overview-sigma-value">${formatNumber(stats.std, 2)}%</span><span class="overview-samples">n=${Number(stats.count || 0)}</span></span></div>
                         `;
+                    }
+                    // Update expiry element if the incoming update includes expiry information
+                    try {
+                        const expiryElCard = document.getElementById(`mobile-expiry-${symbol}`);
+                        const expiryElOverview = document.getElementById(`mobile-overview-expiry-${symbol}`);
+                        const incomingExpiry = newPricePoint && (newPricePoint.time_to_expiry_seconds !== undefined ? newPricePoint.time_to_expiry_seconds : (newPricePoint.expires_in !== undefined ? newPricePoint.expires_in : undefined));
+                        if (incomingExpiry !== undefined && Number.isFinite(Number(incomingExpiry))) {
+                            mobileExpiryTimestamps[symbol] = Date.now() + (Number(incomingExpiry) * 1000);
+                            const formatted = formatTimeToExpiry(Math.max(0, Math.floor(Number(incomingExpiry))));
+                            if (expiryElCard) expiryElCard.innerHTML = formatted;
+                            if (expiryElOverview) expiryElOverview.innerHTML = formatted;
+                        } else if (mobileExpiryTimestamps[symbol]) {
+                            // Ensure elements are kept up-to-date with stored timestamp
+                            const secs = Math.max(0, Math.floor((mobileExpiryTimestamps[symbol] - Date.now()) / 1000));
+                            const formatted = formatTimeToExpiry(secs);
+                            if (expiryElCard) expiryElCard.innerHTML = formatted;
+                            if (expiryElOverview) expiryElOverview.innerHTML = formatted;
+                        }
+                    } catch (err) {
+                        // ignore
                     }
                     // (header-stats updating removed)
                     // Update highlight state for position (if holdings changed)
@@ -4460,8 +4507,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isMobileView()) return;
 
         assets.forEach(asset => {
-            const expiryEl = document.getElementById(`mobile-expiry-${asset.symbol}`);
-            if (!expiryEl) return;
+            // Update both the mobile asset card expiry element and the overview expiry element
+            const expiryElCard = document.getElementById(`mobile-expiry-${asset.symbol}`);
+            const expiryElOverview = document.getElementById(`mobile-overview-expiry-${asset.symbol}`);
+            // If neither element exists, nothing to update for this asset
+            if (!expiryElCard && !expiryElOverview) return;
             
             // Support both expires_in (from mobileAssets) and time_to_expiry_seconds (from socket updates)
             const expirySeconds = asset.expires_in !== undefined ? asset.expires_in : asset.time_to_expiry_seconds;
@@ -4484,7 +4534,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             // Use the same formatTimeToExpiry function as desktop Assets table
-            expiryEl.innerHTML = formatTimeToExpiry(seconds);
+            const formatted = formatTimeToExpiry(seconds);
+            if (expiryElCard) expiryElCard.innerHTML = formatted;
+            if (expiryElOverview) expiryElOverview.innerHTML = formatted;
         });
     }
 
@@ -4493,13 +4545,16 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Update all assets based on stored timestamps
         Object.keys(mobileExpiryTimestamps).forEach(symbol => {
-            const expiryEl = document.getElementById(`mobile-expiry-${symbol}`);
-            if (!expiryEl) return;
-            
+            const expiryElCard = document.getElementById(`mobile-expiry-${symbol}`);
+            const expiryElOverview = document.getElementById(`mobile-overview-expiry-${symbol}`);
+            if (!expiryElCard && !expiryElOverview) return;
+
             const seconds = Math.max(0, Math.floor((mobileExpiryTimestamps[symbol] - Date.now()) / 1000));
-            
+
             // Use the same formatTimeToExpiry function as desktop Assets table
-            expiryEl.innerHTML = formatTimeToExpiry(seconds);
+            const formatted = formatTimeToExpiry(seconds);
+            if (expiryElCard) expiryElCard.innerHTML = formatted;
+            if (expiryElOverview) expiryElOverview.innerHTML = formatted;
         });
     }
 

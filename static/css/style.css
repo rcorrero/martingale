@@ -2113,6 +2113,15 @@ body.info-page {
     text-align: center;
 }
 
+/* Expiry countdown displayed on overview cards */
+.overview-expiry {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--terminal-text-secondary);
+    margin-top: 4px;
+    line-height: 1;
+}
+
 /* Mean (mu) sign styling */
 .overview-stats .overview-mu.mu-positive {
     color: #7dda58; /* green */
