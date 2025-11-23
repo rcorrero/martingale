@@ -3248,6 +3248,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     mobileOverviewVisible = false;
                 }
             });
+            // Clear the mobile search when the user submits via Enter/Return
+            mobileAssetSearch.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.keyCode === 13) {
+                    // Let any other handlers process first (navigation, selection),
+                    // then clear the input and blur to dismiss the keyboard.
+                    setTimeout(() => {
+                        try {
+                            clearMobileAssetSearch();
+                            mobileAssetSearch.blur();
+                        } catch (err) {
+                            // ignore
+                        }
+                    }, 0);
+                }
+            });
         }
 
         // Setup overview toggle (button inserted in template)
