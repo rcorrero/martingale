@@ -2881,15 +2881,17 @@ body.info-page {
     display: flex;
     justify-content: space-around;
     align-items: center;
+    box-sizing: border-box;
     z-index: 1000;
     backdrop-filter: blur(8px);
 }
 
 .mobile-tab {
-    flex: 1;
-    height: 100%;
+    flex: 1 1 auto;
+    /* Constrain tab height so long/wrapped labels can't stretch the bar */
+    height: calc(50px + env(safe-area-inset-bottom));
+    max-height: calc(50px + env(safe-area-inset-bottom));
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
     background: transparent;
@@ -2903,6 +2905,11 @@ body.info-page {
     cursor: pointer;
     transition: all 0.2s ease;
     border-bottom: 3px solid transparent;
+    padding: 6px 8px;
+    box-sizing: border-box;
+    white-space: nowrap; /* prevent label wrapping */
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .mobile-tab.active {
@@ -2913,6 +2920,10 @@ body.info-page {
 
 .mobile-tab-label {
     padding: 2px 0;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Mobile page containers for tabs */
