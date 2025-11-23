@@ -2377,6 +2377,15 @@ document.addEventListener('DOMContentLoaded', () => {
             updateMobilePrices(assets);
             updateMobileExpiry(Object.values(assets), true); // Force update with fresh server data
             updateMobilePnL(); // Update P&L displays on asset cards
+            // Track last-received timestamps so we can detect gaps when backgrounded
+            try {
+                const now = Date.now();
+                Object.keys(assets).forEach(symbol => {
+                    lastPriceTimestamps[symbol] = now;
+                });
+            } catch (err) {
+                // ignore
+            }
         }
     });
 
@@ -3108,6 +3117,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let wheelDeltaY = 0;
     let mobilePreviousPrices = {}; // Track price changes for color coding
     let mobileExpiryTimestamps = {}; // Track expiry timestamps for real-time countdown
+    let lastPriceTimestamps = {}; // Track last received price timestamp per symbol (ms since epoch)
     let assetHistories = {}; // Cached histories for overview stats
     let mobileOverviewVisible = false; // Is overview panel visible
 
@@ -3311,6 +3321,59 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             } catch (err) {
                 // ignore
+            }
+        }
+
+        // Fetch recent histories and merge with existing cached histories.
+        // Used to reconcile missed updates after the app was backgrounded.
+        async function fetchAndMergeHistories() {
+            try {
+                const resp = await fetch('/api/assets/history');
+                if (!resp.ok) return;
+                const data = await resp.json();
+
+                // For each symbol, merge new points into assetHistories
+                Object.entries(data).forEach(([symbol, history]) => {
+                    const normalized = (history || []).map(p => ({ time: Number(p.time), price: Number(p.price) })).filter(p => Number.isFinite(p.time) && Number.isFinite(p.price)).sort((a,b) => a.time - b.time);
+                    if (!normalized.length) return;
+
+                    const existing = assetHistories[symbol] || [];
+                    const lastExistingTime = existing.length ? existing[existing.length - 1].time : 0;
+                    // Find only points after lastExistingTime
+                    const newPoints = normalized.filter(p => p.time > lastExistingTime);
+                    if (newPoints.length === 0) return;
+
+                    // Append and trim
+                    const merged = existing.concat(newPoints).slice(-200);
+                    assetHistories[symbol] = merged;
+
+                    // Update mobile charts if present
+                    try {
+                        const chartObj = mobileCharts.find(c => c.symbol === symbol);
+                        if (chartObj && chartObj.chart) {
+                            // Chart datasets use {x: Date, y: Number}
+                            const chartData = merged.map(p => ({ x: new Date(p.time), y: p.price }));
+                            chartObj.chart.data.datasets[0].data = chartData;
+                            chartObj.chart.update('none');
+                        }
+                    } catch (err) {
+                        // ignore
+                    }
+                });
+
+                // Refresh overview/cards so statistics reflect merged history
+                try {
+                    if (isMobileView()) {
+                        if (mobileOverviewVisible) {
+                            renderMobileAssetOverview();
+                        }
+                        updateMobileAssetDisplay();
+                    }
+                } catch (err) {
+                    // ignore
+                }
+            } catch (err) {
+                // ignore network errors
             }
         }
 
@@ -3656,6 +3719,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.updateMobileOverviewSingle = updateMobileOverviewSingle;
             window.renderMobileAssetOverview = renderMobileAssetOverview;
             window.ensureAssetHistoriesLoaded = ensureHistoriesLoaded;
+            window.fetchAndMergeHistories = fetchAndMergeHistories;
         } catch (err) {
             // ignore if window not writable in some contexts
         }
@@ -3674,6 +3738,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateMobileExpiryCountdown();
             }
         }, 1000);
+
+        // When the app becomes visible again (e.g., returning from background),
+        // try to reconcile any missed price/history updates by fetching histories
+        // and merging them into the cached histories. We also do this on focus
+        // and when the socket reconnects.
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                fetchAndMergeHistories();
+            }
+        }, { passive: true });
+
+        window.addEventListener('focus', () => {
+            fetchAndMergeHistories();
+        }, { passive: true });
+
+        try {
+            socket.on('connect', () => {
+                // Reconcile missed updates after reconnect
+                fetchAndMergeHistories();
+            });
+        } catch (err) {
+            // ignore if socket not available
+        }
     }
 
     function handleMobileTouchStart(e) {
