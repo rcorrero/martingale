@@ -2148,7 +2148,9 @@ body.info-page {
     display: flex;
     justify-content: center;
     gap: 8px;
-    align-items: center;
+    /* Align label with the top of the value block so symbols (μ/σ)
+       line up with the numeric estimate even when the value stacks */
+    align-items: flex-start;
 }
 .overview-stat-label {
     width: 18px; /* fixed label width so values align */
@@ -2159,7 +2161,9 @@ body.info-page {
 .overview-stat-value {
     min-width: 48px;
     text-align: left;
-    display: inline-block;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
 }
 
 /* Sigma magnitude coloring */
@@ -2174,6 +2178,19 @@ body.info-page {
 .overview-sigma.sigma-high {
     color: #f85149; /* red */
     font-weight: 700;
+}
+
+/* Sample count inline with σ (small, muted) */
+.overview-samples {
+    font-size: 10px;
+    color: var(--terminal-text-secondary);
+    margin-left: 0;
+    margin-top: 2px;
+    display: block;
+}
+.overview-sigma-value {
+    font-weight: 700;
+    display: block;
 }
 
 /* Mobile header stats inline next to expiry */

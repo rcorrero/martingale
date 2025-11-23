@@ -3414,7 +3414,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     statsEl.innerHTML = `
                         <div class="overview-stat-row"><span class="overview-stat-label">μ</span><span class="overview-stat-value overview-mu ${muClass}">${formatNumber(stats.mean, 2)}%</span></div>
-                        <div class="overview-stat-row"><span class="overview-stat-label">σ</span><span class="overview-stat-value overview-sigma ${sigmaClass}">${formatNumber(stats.std, 2)}%</span></div>
+                        <div class="overview-stat-row"><span class="overview-stat-label">σ</span><span class="overview-stat-value overview-sigma ${sigmaClass}"><span class="overview-sigma-value">${formatNumber(stats.std, 2)}%</span><span class="overview-samples">n=${Number(stats.count || 0)}</span></span></div>
                     `;
 
                     card.appendChild(btn);
@@ -3486,7 +3486,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         statsEl.innerHTML = `
                             <div class="overview-stat-row"><span class="overview-stat-label">μ</span><span class="overview-stat-value overview-mu ${muClass}">${formatNumber(stats.mean, 2)}%</span></div>
-                            <div class="overview-stat-row"><span class="overview-stat-label">σ</span><span class="overview-stat-value overview-sigma ${sigmaClass}">${formatNumber(stats.std, 2)}%</span></div>
+                            <div class="overview-stat-row"><span class="overview-stat-label">σ</span><span class="overview-stat-value overview-sigma ${sigmaClass}"><span class="overview-sigma-value">${formatNumber(stats.std, 2)}%</span><span class="overview-samples">n=${Number(stats.count || 0)}</span></span></div>
                         `;
                     }
                     // (header-stats updating removed)
