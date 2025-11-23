@@ -3216,6 +3216,14 @@ document.addEventListener('DOMContentLoaded', () => {
             mobileQuantityConfirm.addEventListener('click', confirmMobileTrade);
         }
 
+        // Update estimated cost when quantity input changes
+        if (mobileQuantityInput) {
+            mobileQuantityInput.addEventListener('input', () => {
+                // Recompute buying power / estimated cost for the active asset
+                updateMobileBuyingPower();
+            });
+        }
+
         // Set up mobile asset search
         const mobileAssetSearch = document.getElementById('mobile-asset-search');
         if (mobileAssetSearch) {
@@ -3545,6 +3553,18 @@ document.addEventListener('DOMContentLoaded', () => {
                             const formatted = formatTimeToExpiry(secs);
                             if (expiryElCard) expiryElCard.innerHTML = formatted;
                             if (expiryElOverview) expiryElOverview.innerHTML = formatted;
+                        }
+                    } catch (err) {
+                        // ignore
+                    }
+                    // If the mobile quantity modal is open and this symbol is the current one,
+                    // update the estimated cost so price changes reflect immediately.
+                    try {
+                        if (mobileQuantityModal && mobileQuantityModal.classList.contains('active')) {
+                            const currentSym = mobileAssets[currentMobileAssetIndex] && mobileAssets[currentMobileAssetIndex].symbol;
+                            if (currentSym === symbol) {
+                                updateMobileBuyingPower();
+                            }
                         }
                     } catch (err) {
                         // ignore
@@ -4021,6 +4041,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 chartObj.chart.update('none');
             }
         });
+
+        // If the quantity modal is open, refresh the estimated cost display
+        try {
+            if (mobileQuantityModal && mobileQuantityModal.classList.contains('active')) {
+                updateMobileBuyingPower();
+            }
+        } catch (err) {
+            // ignore
+        }
     }
 
     function createMobileAssetChart(canvas, asset) {
@@ -4592,6 +4621,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const bpCashEl = document.getElementById('mobile-bp-cash');
         const bpPriceEl = document.getElementById('mobile-bp-price');
         const bpSharesEl = document.getElementById('mobile-bp-shares');
+        const bpCostEl = document.getElementById('mobile-bp-cost');
         
         // Get the label elements
         const bpCashLabelEl = document.querySelector('.mobile-bp-row:nth-child(1) .mobile-bp-label');
@@ -4623,6 +4653,16 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (bpSharesEl) {
                 bpSharesEl.textContent = '--';
             }
+        }
+
+        // Update estimated cost based on current quantity input and price
+        try {
+            const qtyVal = mobileQuantityInput ? parseFloat(mobileQuantityInput.value) : 0;
+            const qty = Number.isFinite(qtyVal) ? Math.max(0, qtyVal) : 0;
+            const estimatedCost = qty * (currentPrice || 0);
+            if (bpCostEl) bpCostEl.textContent = qty > 0 ? formatCurrencyLocale(estimatedCost) : formatCurrencyLocale(0);
+        } catch (err) {
+            // ignore
         }
     }
 
