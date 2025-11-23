@@ -67,6 +67,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const notificationAutoCloseTimers = new Map();
     // Fallback timer for resync toast
     let resyncFallbackTimer = null;
+    // Reference counter to avoid duplicate resync toasts when multiple
+    // handlers trigger reload/merge concurrently (visibility, focus,
+    // socket reconnect, etc.). We increment when a resync starts and
+    // decrement when it finishes; only show the final success/failure
+    // once the counter reaches zero.
+    let resyncCounter = 0;
 
     // Function to apply asset search filter
     function applyAssetSearchFilter() {
@@ -1164,21 +1170,39 @@ document.addEventListener('DOMContentLoaded', () => {
     // Helpers to show/hide a transient "Re-syncing..." toast while
     // reconciliation / full reload work is in progress.
     function showResyncToast() {
-        // Clear any existing fallback hide timer
+        // Increment counter and only create the visible persistent
+        // notification when transitioning from 0 -> 1.
+        resyncCounter = (resyncCounter || 0) + 1;
+
+        // Clear any existing fallback hide timer when a new resync begins
         if (resyncFallbackTimer) {
             clearTimeout(resyncFallbackTimer);
             resyncFallbackTimer = null;
         }
-        showNotification('Re-syncing…', 'info', { id: 'resyncing', autoClose: false, replaceExisting: true });
+
+        if (resyncCounter === 1) {
+            showNotification('Re-syncing…', 'info', { id: 'resyncing', autoClose: false, replaceExisting: true });
+        }
     }
 
     function hideResyncToast(success = true) {
+        // Decrement counter and ensure it never goes below zero.
+        resyncCounter = Math.max(0, (resyncCounter || 0) - 1);
+
+        // If other concurrent resyncs are still running, don't remove the
+        // persistent notification yet.
+        if (resyncCounter > 0) {
+            return;
+        }
+
         // Remove the persistent resync notification
         try { removeNotificationById('resyncing'); } catch (e) {}
+
         if (resyncFallbackTimer) {
             clearTimeout(resyncFallbackTimer);
             resyncFallbackTimer = null;
         }
+
         // Briefly show a success/failure toast so the user gets feedback
         try {
             if (success) {
@@ -3862,9 +3886,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 refreshPortfolioHistory();
                 updateMobileAssetDisplay();
                 updateMobilePortfolioChart();
+
+                // Completed reload work — decrement resync counter and show success
+                try {
+                    // Clear fallback timer if still pending
+                    if (resyncFallbackTimer) {
+                        clearTimeout(resyncFallbackTimer);
+                        resyncFallbackTimer = null;
+                    }
+                    hideResyncToast(true);
+                } catch (e) {
+                    // ignore
+                }
             } catch (err) {
                 // swallow errors to avoid disrupting visibility handlers
                 console.warn('reloadChartsFull failed', err);
+                try {
+                    if (resyncFallbackTimer) {
+                        clearTimeout(resyncFallbackTimer);
+                        resyncFallbackTimer = null;
+                    }
+                    hideResyncToast(false);
+                } catch (e) {}
             }
         }
 
