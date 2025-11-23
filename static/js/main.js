@@ -3555,6 +3555,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
+
+        // Intercept touch events on the overview panel so they don't
+        // propagate to the underlying carousel. This prevents swiping
+        // inside the overview from changing the displayed asset card.
+        if (mobileOverviewPanel) {
+            ['touchstart', 'touchmove', 'touchend'].forEach((ev) => {
+                mobileOverviewPanel.addEventListener(ev, function(e) {
+                    if (mobileOverviewVisible) {
+                        e.stopPropagation();
+                        // Allow preventing default on move to stop scrolling
+                        if (ev === 'touchmove') {
+                            try { e.preventDefault(); } catch (err) {}
+                        }
+                    }
+                }, { passive: false });
+            });
+        }
         // Expose a couple helpers to the outer scope so real-time handlers can update the overview
         try {
             window.updateMobileOverviewSingle = updateMobileOverviewSingle;
@@ -3581,6 +3598,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMobileTouchStart(e) {
+        // If the overview is visible, ignore carousel touch handlers so
+        // swipes inside the overview don't change the underlying card.
+        if (mobileOverviewVisible) {
+            touchStartY = 0;
+            isSwiping = false;
+            return;
+        }
+
         touchStartY = e.touches[0].clientY;
         isSwiping = false;
         
@@ -3591,6 +3616,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMobileTouchMove(e) {
+        // If the overview is visible, do not allow the carousel to react
+        // to touch-move gestures.
+        if (mobileOverviewVisible) {
+            // Prevent default to stop any underlying scrolling behavior
+            // and stop propagation (overview intercepts this elsewhere too).
+            try { e.preventDefault(); } catch (err) {}
+            return;
+        }
+
         if (!touchStartY) return;
         
         touchEndY = e.touches[0].clientY;
@@ -3609,6 +3643,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleMobileTouchEnd(e) {
+        // If the overview is visible, ignore touchend for carousel navigation
+        if (mobileOverviewVisible) {
+            touchStartY = 0;
+            touchEndY = 0;
+            isSwiping = false;
+            // Ensure window scroll position remains consistent
+            window.scrollTo(0, 1);
+            return;
+        }
+
         if (!isSwiping) {
             touchStartY = 0;
             touchEndY = 0;

@@ -2011,7 +2011,9 @@ body.info-page {
     display: none; /* hidden by default */
     /* place overview in the same viewport area as asset cards so it doesn't overlap header/search */
     position: fixed;
-    top: 136px; /* align with .mobile-asset-card top */
+    /* align with .mobile-asset-card top and account for safe-area */
+    top: calc(136px + env(safe-area-inset-top));
+    top: calc(136px + constant(safe-area-inset-top));
     left: 0;
     right: 0;
     bottom: 120px; /* leave room for bottom controls */
@@ -2563,7 +2565,9 @@ body.info-page {
 /* Individual asset card - fills entire viewport */
 .mobile-asset-card {
     position: absolute;
-    top: 136px; /* Start below top bar (60px) and search container (~60px) */
+    /* Start below top bar and search container; add safe-area inset so notch doesn't overlap */
+    top: calc(136px + env(safe-area-inset-top));
+    top: calc(136px + constant(safe-area-inset-top));
     left: 0;
     right: 0;
     bottom: 0;
@@ -2726,13 +2730,17 @@ body.info-page {
     top: 0;
     left: 0;
     right: 0;
-    height: 60px;
+    /* Respect the iPhone notch / safe area inset */
+    padding-top: constant(safe-area-inset-top);
+    padding-top: env(safe-area-inset-top);
+    height: calc(60px + env(safe-area-inset-top));
     background: linear-gradient(180deg, rgba(1, 1, 1, 0.95) 0%, rgba(1, 1, 1, 0.85) 100%);
     border-bottom: 1px solid var(--terminal-border);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 20px;
+    padding-left: 20px;
+    padding-right: 20px;
     z-index: 1001;
     backdrop-filter: blur(10px);
 }
@@ -2790,16 +2798,20 @@ body.info-page {
 /* Fixed bottom bar with trading controls */
 .mobile-bottom-bar {
     position: fixed;
-    bottom: 0;
     left: 0;
     right: 0;
-    height: 80px;
+    /* Reserve space for the home indicator on modern iPhones */
+    bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: constant(safe-area-inset-bottom);
+    height: calc(80px + env(safe-area-inset-bottom));
     background: linear-gradient(0deg, rgba(1, 1, 1, 0.95) 0%, rgba(1, 1, 1, 0.85) 100%);
     border-top: 1px solid var(--terminal-border);
     display: flex;
     align-items: center;
     justify-content: space-around;
-    padding: 0 15px;
+    padding-left: 15px;
+    padding-right: 15px;
     z-index: 1001;
     backdrop-filter: blur(10px);
 }
@@ -2858,10 +2870,12 @@ body.info-page {
 /* Tab navigation at bottom of screen */
 .mobile-tab-bar {
     position: fixed;
-    bottom: 80px;
+    /* Place above the bottom bar and account for safe-area */
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    bottom: calc(80px + constant(safe-area-inset-bottom));
     left: 0;
     right: 0;
-    height: 50px;
+    height: calc(50px + env(safe-area-inset-bottom));
     background: rgba(7, 8, 10, 0.95);
     border-top: 1px solid var(--terminal-border);
     display: flex;
@@ -3305,7 +3319,9 @@ body.info-page {
 /* Mobile asset search */
 .mobile-asset-search-container {
     position: fixed;
-    top: 60px; /* Position below mobile top bar */
+    /* Position below mobile top bar and account for notch */
+    top: calc(60px + env(safe-area-inset-top));
+    top: calc(60px + constant(safe-area-inset-top));
     left: 0;
     right: 0;
     z-index: 1000;
