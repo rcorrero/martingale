@@ -78,6 +78,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // or out-of-order hide calls don't affect newer sessions.
     let resyncSession = 0;
     let resyncActiveSession = null;
+    // Feature flag: enable/disable automatic re-sync on visibility/focus/socket
+    // Set to `false` to disable the automatic re-sync behavior (useful for
+    // troubleshooting or when client-side trimming already fixes issues).
+    const RESYNC_ENABLED = false;
 
     // Function to apply asset search filter
     function applyAssetSearchFilter() {
@@ -3934,6 +3938,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         document.addEventListener('visibilitychange', () => {
+            if (!RESYNC_ENABLED) return;
             if (document.visibilityState === 'visible') {
                 // Recreate charts fully and then reconcile any missing history
                 reloadChartsFull();
@@ -3942,12 +3947,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { passive: true });
 
         window.addEventListener('focus', () => {
+            if (!RESYNC_ENABLED) return;
             reloadChartsFull();
             fetchAndMergeHistories();
         }, { passive: true });
 
         try {
             socket.on('connect', () => {
+                if (!RESYNC_ENABLED) return;
                 // Reconcile missed updates after reconnect
                 fetchAndMergeHistories();
             });
