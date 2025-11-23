@@ -65,6 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const expiringAssetNotifications = new Map();
     const expiringNotificationSnoozed = new Map();
     const notificationAutoCloseTimers = new Map();
+    // Fallback timer for resync toast
+    let resyncFallbackTimer = null;
 
     // Function to apply asset search filter
     function applyAssetSearchFilter() {
@@ -1156,6 +1158,36 @@ document.addEventListener('DOMContentLoaded', () => {
         const notification = container.querySelector(`.notification[data-notification-id="${id}"]`);
         if (notification) {
             removeNotification(notification, id);
+        }
+    }
+
+    // Helpers to show/hide a transient "Re-syncing..." toast while
+    // reconciliation / full reload work is in progress.
+    function showResyncToast() {
+        // Clear any existing fallback hide timer
+        if (resyncFallbackTimer) {
+            clearTimeout(resyncFallbackTimer);
+            resyncFallbackTimer = null;
+        }
+        showNotification('Re-syncing…', 'info', { id: 'resyncing', autoClose: false, replaceExisting: true });
+    }
+
+    function hideResyncToast(success = true) {
+        // Remove the persistent resync notification
+        try { removeNotificationById('resyncing'); } catch (e) {}
+        if (resyncFallbackTimer) {
+            clearTimeout(resyncFallbackTimer);
+            resyncFallbackTimer = null;
+        }
+        // Briefly show a success/failure toast so the user gets feedback
+        try {
+            if (success) {
+                showNotification('Re-synced', 'success', { autoCloseMs: 1200 });
+            } else {
+                showNotification('Re-sync failed', 'warning', { autoCloseMs: 1800 });
+            }
+        } catch (e) {
+            // ignore
         }
     }
 
@@ -3327,9 +3359,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // Fetch recent histories and merge with existing cached histories.
         // Used to reconcile missed updates after the app was backgrounded.
         async function fetchAndMergeHistories() {
+            // Show transient resync toast while reconciliation runs
+            showResyncToast();
+            let ok = true;
             try {
                 const resp = await fetch('/api/assets/history');
-                if (!resp.ok) return;
+                if (!resp.ok) {
+                    ok = false;
+                    return;
+                }
                 const data = await resp.json();
 
                 // For each symbol, merge new points into assetHistories
@@ -3373,7 +3411,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     // ignore
                 }
             } catch (err) {
-                // ignore network errors
+                // network error
+                ok = false;
+            } finally {
+                // Ensure the resync toast is hidden and provide brief feedback
+                // Use a short fallback in case reloadChartsFull didn't clear it
+                try {
+                    hideResyncToast(ok);
+                } catch (e) {
+                    // ignore
+                }
             }
         }
 
@@ -3743,13 +3790,94 @@ document.addEventListener('DOMContentLoaded', () => {
         // try to reconcile any missed price/history updates by fetching histories
         // and merging them into the cached histories. We also do this on focus
         // and when the socket reconnects.
+        // Full reload helper: destroy and recreate charts and mobile charts so
+        // they appear exactly as if the app was freshly opened.
+        function reloadChartsFull() {
+            try {
+                // Show transient resync toast to indicate work is in progress.
+                showResyncToast();
+                // Safety fallback: hide the toast after 8s if something goes wrong
+                if (resyncFallbackTimer) {
+                    clearTimeout(resyncFallbackTimer);
+                }
+                resyncFallbackTimer = setTimeout(() => {
+                    try { hideResyncToast(false); } catch (e) {}
+                }, 8000);
+                // Destroy portfolio value chart
+                if (portfolioValueChart && typeof portfolioValueChart.destroy === 'function') {
+                    try { portfolioValueChart.destroy(); } catch (e) {}
+                }
+                portfolioValueChart = null;
+
+                // Destroy mobile portfolio chart
+                if (mobilePortfolioChart && typeof mobilePortfolioChart.destroy === 'function') {
+                    try { mobilePortfolioChart.destroy(); } catch (e) {}
+                }
+                mobilePortfolioChart = null;
+
+                // Destroy any mobileCharts
+                if (Array.isArray(mobileCharts)) {
+                    mobileCharts.forEach(c => {
+                        try {
+                            if (c && c.chart && typeof c.chart.destroy === 'function') c.chart.destroy();
+                        } catch (e) {}
+                    });
+                }
+                mobileCharts = [];
+
+                // Destroy dynamic chartInstances and clear container DOM
+                if (Array.isArray(chartInstances)) {
+                    chartInstances.forEach(ci => {
+                        try {
+                            if (ci && ci.chart && typeof ci.chart.destroy === 'function') ci.chart.destroy();
+                        } catch (e) {}
+                    });
+                }
+                chartInstances = [];
+                if (chartsContainer) {
+                    chartsContainer.innerHTML = '';
+                }
+
+                // Recreate charts and chart system
+                createPortfolioValueChart();
+                initializeChartSystem();
+
+                // Recreate mobile asset charts for currently known mobileAssets
+                try {
+                    mobileAssets.forEach(asset => {
+                        // createMobileAssetChart will destroy any pre-existing chart with same symbol
+                        const canvasSelector = `#mobile-chart-${asset.symbol}`;
+                        const existingCanvas = document.querySelector(canvasSelector);
+                        if (existingCanvas) {
+                            createMobileAssetChart(existingCanvas, asset);
+                        } else {
+                            // If the DOM doesn't have a canvas (cards may be rebuilt), attempt to find and create after rebuild
+                        }
+                    });
+                } catch (err) {
+                    // ignore
+                }
+
+                // Refresh portfolio history and mobile charts data
+                refreshPortfolioHistory();
+                updateMobileAssetDisplay();
+                updateMobilePortfolioChart();
+            } catch (err) {
+                // swallow errors to avoid disrupting visibility handlers
+                console.warn('reloadChartsFull failed', err);
+            }
+        }
+
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
+                // Recreate charts fully and then reconcile any missing history
+                reloadChartsFull();
                 fetchAndMergeHistories();
             }
         }, { passive: true });
 
         window.addEventListener('focus', () => {
+            reloadChartsFull();
             fetchAndMergeHistories();
         }, { passive: true });
 
