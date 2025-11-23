@@ -3557,19 +3557,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Intercept touch events on the overview panel so they don't
-        // propagate to the underlying carousel. This prevents swiping
-        // inside the overview from changing the displayed asset card.
+        // propagate to the underlying carousel. Stop propagation only
+        // (do not preventDefault) so native scrolling inside the
+        // overview continues to work on mobile devices.
         if (mobileOverviewPanel) {
             ['touchstart', 'touchmove', 'touchend'].forEach((ev) => {
                 mobileOverviewPanel.addEventListener(ev, function(e) {
                     if (mobileOverviewVisible) {
                         e.stopPropagation();
-                        // Allow preventing default on move to stop scrolling
-                        if (ev === 'touchmove') {
-                            try { e.preventDefault(); } catch (err) {}
-                        }
+                        // Intentionally do NOT call preventDefault() here so
+                        // the user can scroll the overview content normally.
                     }
-                }, { passive: false });
+                }, { passive: true });
             });
         }
         // Expose a couple helpers to the outer scope so real-time handlers can update the overview
@@ -3869,6 +3868,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update mobileAssets to the new list
         mobileAssets = assets;
+        // Keep a snapshot for the overview renderer to avoid refetching
+        try {
+            latestAssetsSnapshot = Array.isArray(assets) ? Object.fromEntries(assets.map(a => [a.symbol, a])) : latestAssetsSnapshot;
+        } catch (err) {
+            // ignore
+        }
 
         // Try to maintain the same symbol if it still exists
         if (currentSymbol) {
@@ -3892,6 +3897,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update display without animations to prevent visual glitches
         updateMobileAssetDisplay(true);
+
+        // If the mobile overview is open, re-render it so it reflects
+        // the current asset list (including expired/added assets).
+        try {
+            if (mobileOverviewVisible) {
+                renderMobileAssetOverview();
+            }
+        } catch (err) {
+            // ignore
+        }
     }
 
     function updateMobileAssetDisplay(skipAnimation = false) {
