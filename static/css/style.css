@@ -2876,10 +2876,11 @@ body.info-page {
 .mobile-tab-bar {
     position: fixed;
     /* Place above the bottom bar and account for safe-area */
-    /* Position directly above the bottom bar (bottom bar height = 80px).
-       Do not add the safe-area inset to the tab's height to avoid
-       visual elongation on devices with a home indicator. */
-    bottom: calc(80px);
+     /* Position directly above the bottom bar (bottom bar height = 80px).
+         Account for the bottom bar's safe-area padding so the tab bar
+         is always clear of the buy/sell controls. */
+     bottom: calc(80px + env(safe-area-inset-bottom));
+     bottom: calc(80px + constant(safe-area-inset-bottom));
     left: 0;
     right: 0;
     height: 50px;
