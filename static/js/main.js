@@ -4768,9 +4768,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const typeColor = isSettlement ? '#f85149' : (tx.type === 'buy' ? '#7dda58' : '#f85149');
             const typeText = isSettlement ? 'SETTLED' : (tx.type || '').toUpperCase();
 
+            // Use authoritative asset color when available
+            const assetDataForColor = (availableAssetDetails && availableAssetDetails[tx.symbol]) || (latestAssetsSnapshot && latestAssetsSnapshot[tx.symbol]) || null;
+            const badgeColor = getInstrumentColor(tx.symbol, assetDataForColor);
+
             row.innerHTML = `
                 <td>${timeStr}</td>
-                <td><span class="symbol-badge">${tx.symbol}</span></td>
+                <td><span class="symbol-badge" style="background-color: ${badgeColor};">${tx.symbol}</span></td>
                 <td style="color: ${typeColor}; font-weight: 600;">${typeText}</td>
                 <td>${formatQuantity(tx.quantity)}</td>
                 <td>${formatCurrencyLocale(tx.price)}</td>
