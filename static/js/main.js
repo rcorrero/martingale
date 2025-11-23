@@ -73,6 +73,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // decrement when it finishes; only show the final success/failure
     // once the counter reaches zero.
     let resyncCounter = 0;
+    // Session id to associate start/finish of a coalesced resync operation.
+    // Incremented each time we transition from 0->1 so late fallback timers
+    // or out-of-order hide calls don't affect newer sessions.
+    let resyncSession = 0;
+    let resyncActiveSession = null;
 
     // Function to apply asset search filter
     function applyAssetSearchFilter() {
@@ -1181,6 +1186,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (resyncCounter === 1) {
+            // Start a new session so any previously scheduled fallback
+            // or late hide calls won't affect this run.
+            resyncSession = (resyncSession || 0) + 1;
+            resyncActiveSession = resyncSession;
             showNotification('Re-syncing…', 'info', { id: 'resyncing', autoClose: false, replaceExisting: true });
         }
     }
@@ -1202,6 +1211,10 @@ document.addEventListener('DOMContentLoaded', () => {
             clearTimeout(resyncFallbackTimer);
             resyncFallbackTimer = null;
         }
+
+        // Clear the active session marker when finished so late timers don't
+        // accidentally affect future sessions.
+        resyncActiveSession = null;
 
         // Briefly show a success/failure toast so the user gets feedback
         try {
@@ -3824,8 +3837,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (resyncFallbackTimer) {
                     clearTimeout(resyncFallbackTimer);
                 }
+                // Capture the current session so the fallback only affects
+                // this session and not any that start later.
+                const _resyncSessionForFallback = resyncActiveSession;
                 resyncFallbackTimer = setTimeout(() => {
-                    try { hideResyncToast(false); } catch (e) {}
+                    try {
+                        if (_resyncSessionForFallback && resyncActiveSession === _resyncSessionForFallback) {
+                            hideResyncToast(false);
+                        }
+                    } catch (e) {}
                 }, 8000);
                 // Destroy portfolio value chart
                 if (portfolioValueChart && typeof portfolioValueChart.destroy === 'function') {
